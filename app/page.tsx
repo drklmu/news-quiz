@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 export default function Home() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const correctAnswer: string = "Nairobi";
+  const explanationText = "Nairobi hosted the UN Climate Summit, bringing together leaders from across Africa and beyond.";
+  const [typedText, setTypedText] = useState("");
+  const typingComplete = typedText.length === explanationText.length;
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   useEffect(() => {
@@ -13,6 +16,23 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(interval);
   }, [isRunning]);
+  useEffect(() => {
+    if (selectedAnswer === null || selectedAnswer === correctAnswer) return;
+
+    setTypedText("");
+    let index = 0;
+
+    const typingInterval = setInterval(() => {
+      index++;
+      setTypedText(explanationText.slice(0, index));
+
+      if (index >= explanationText.length) {
+        clearInterval(typingInterval);
+      }
+    }, 45);
+
+    return () => clearInterval(typingInterval);
+  }, [selectedAnswer]);
   const roundedSeconds = Math.floor(seconds / 10) * 10;
   const minutes = Math.floor(roundedSeconds / 60);
   const displaySeconds = roundedSeconds % 60;
@@ -46,7 +66,7 @@ export default function Home() {
                 }}
                 className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
                   ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Paris" === correctAnswer
+                  : "Paris" === correctAnswer && (selectedAnswer === correctAnswer || typingComplete)
                     ? "border-green-500 bg-green-50 dark:bg-green-950"
                     : selectedAnswer === "Paris"
                       ? "border-red-500 bg-red-50 dark:bg-red-950"
@@ -61,7 +81,7 @@ export default function Home() {
                 }}
                 className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
                   ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Tokyo" === correctAnswer
+                  : "Tokyo" === correctAnswer && (selectedAnswer === correctAnswer || typingComplete)
                     ? "border-green-500 bg-green-50 dark:bg-green-950"
                     : selectedAnswer === "Tokyo"
                       ? "border-red-500 bg-red-50 dark:bg-red-950"
@@ -76,7 +96,7 @@ export default function Home() {
                 }}
                 className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
                   ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Berlin" === correctAnswer
+                  : "Berlin" === correctAnswer && (selectedAnswer === correctAnswer || typingComplete)
                     ? "border-green-500 bg-green-50 dark:bg-green-950"
                     : selectedAnswer === "Berlin"
                       ? "border-red-500 bg-red-50 dark:bg-red-950"
@@ -91,7 +111,7 @@ export default function Home() {
                 }}
                 className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
                   ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Nairobi" === correctAnswer
+                  : "Nairobi" === correctAnswer && (selectedAnswer === correctAnswer || typingComplete)
                     ? "border-green-500 bg-green-50 dark:bg-green-950"
                     : selectedAnswer === "Nairobi"
                       ? "border-red-500 bg-red-50 dark:bg-red-950"
@@ -100,7 +120,12 @@ export default function Home() {
                 Nairobi
               </button>
             </div>
-          </div></div>
+          </div>{typedText && (
+            <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
+              {typedText}
+            </p>
+          )}
+        </div>
       </main >
     </div >
   );
