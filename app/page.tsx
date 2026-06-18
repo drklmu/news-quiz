@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 export default function Home() {
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   useEffect(() => {
