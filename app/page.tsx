@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 export default function Home() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const correctAnswer: string = "Nairobi";
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   useEffect(() => {
@@ -43,9 +44,14 @@ export default function Home() {
                   setSelectedAnswer("Paris");
                   setIsRunning(false);
                 }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === "Paris"
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                  : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"}`}>
+                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
+                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  : "Paris" === correctAnswer
+                    ? "border-green-500 bg-green-50 dark:bg-green-950"
+                    : selectedAnswer === "Paris"
+                      ? "border-red-500 bg-red-50 dark:bg-red-950"
+                      : "border-zinc-200 opacity-50"
+                  }`}>
                 Paris
               </button>
               <button
@@ -53,9 +59,14 @@ export default function Home() {
                   setSelectedAnswer("Tokyo");
                   setIsRunning(false);
                 }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === "Tokyo"
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                  : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"}`}>
+                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
+                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  : "Tokyo" === correctAnswer
+                    ? "border-green-500 bg-green-50 dark:bg-green-950"
+                    : selectedAnswer === "Tokyo"
+                      ? "border-red-500 bg-red-50 dark:bg-red-950"
+                      : "border-zinc-200 opacity-50"
+                  }`}>
                 Tokyo
               </button>
               <button
@@ -63,9 +74,14 @@ export default function Home() {
                   setSelectedAnswer("Berlin");
                   setIsRunning(false);
                 }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === "Berlin"
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                  : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"}`}>
+                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
+                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  : "Berlin" === correctAnswer
+                    ? "border-green-500 bg-green-50 dark:bg-green-950"
+                    : selectedAnswer === "Berlin"
+                      ? "border-red-500 bg-red-50 dark:bg-red-950"
+                      : "border-zinc-200 opacity-50"
+                  }`}>
                 Berlin
               </button>
               <button
@@ -73,9 +89,14 @@ export default function Home() {
                   setSelectedAnswer("Nairobi");
                   setIsRunning(false);
                 }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === "Nairobi"
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                  : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"}`}>
+                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
+                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  : "Nairobi" === correctAnswer
+                    ? "border-green-500 bg-green-50 dark:bg-green-950"
+                    : selectedAnswer === "Nairobi"
+                      ? "border-red-500 bg-red-50 dark:bg-red-950"
+                      : "border-zinc-200 opacity-50"
+                  }`}>
                 Nairobi
               </button>
             </div>
