@@ -3,6 +3,8 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
+  const [quizComplete, setQuizComplete] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const questions = [
     {
@@ -56,6 +58,81 @@ export default function Home() {
   const roundedSeconds = Math.floor(seconds / 10) * 10;
   const minutes = Math.floor(roundedSeconds / 60);
   const displaySeconds = roundedSeconds % 60;
+  if (quizComplete) {
+    const score = answers.filter(a => a.chosen === a.correct).length;
+    const totalTime = minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`;
+
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+        <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-start gap-8 py-32 px-16 bg-white dark:bg-black">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <h1 className="text-3xl font-semibold text-black dark:text-zinc-50">
+              Quiz Complete!
+            </h1>
+            <p className="text-xl text-zinc-600 dark:text-zinc-400">
+              You scored {score} out of {questions.length} in {totalTime}
+            </p>
+          </div>
+
+          <div className="w-full max-w-md flex flex-col gap-6">
+            {answers.map((answer, index) => (
+              <div key={index} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+                  Question {index + 1}
+                </p>
+                <p className="text-base font-semibold text-black dark:text-zinc-50 mb-4">
+                  {answer.question}
+                </p>
+                <div className="flex flex-col gap-2">
+                  <p className={`text-sm px-3 py-2 rounded-lg ${answer.chosen === answer.correct ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                    Your answer: {answer.chosen}
+                  </p>
+                  {answer.chosen !== answer.correct && (
+                    <p className="text-sm px-3 py-2 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                      Correct answer: {answer.correct}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-2">
+              Compare your results
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+              Sign up to receive your ranking compared to all other quizzers tonight at midnight.
+            </p>
+            <div className="flex flex-col gap-3">
+              <input
+                type="text"
+                placeholder="Your name"
+                className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+              <input
+                type="email"
+                placeholder="Your email address"
+                className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+              <select className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white">
+                <option value="">Select your age group</option>
+                <option value="60-65">60–65</option>
+                <option value="66-70">66–70</option>
+                <option value="71-75">71–75</option>
+                <option value="76-80">76–80</option>
+                <option value="81+">81+</option>
+              </select>
+              <button className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
+                Send me my ranking tonight
+              </button>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-start gap-8 py-32 px-16 bg-white dark:bg-black">
@@ -113,12 +190,22 @@ export default function Home() {
           {selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer) && (
             <button
               onClick={() => {
+                const newAnswers = [...answers, {
+                  question: currentQuestion.question,
+                  chosen: selectedAnswer ?? "",
+                  correct: currentQuestion.correctAnswer,
+                }];
+                setAnswers(newAnswers);
+
                 if (currentQuestionIndex < questions.length - 1) {
                   setCurrentQuestionIndex(currentQuestionIndex + 1);
+                  setSelectedAnswer(null);
+                  setTypedText("");
+                  setIsRunning(true);
+                } else {
+                  setQuizComplete(true);
+                  setIsRunning(false);
                 }
-                setSelectedAnswer(null);
-                setTypedText("");
-                setIsRunning(true);
               }}
               className="mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
             >
