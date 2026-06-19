@@ -125,6 +125,18 @@ export default function Home() {
               {typedText}
             </p>
           )}
+          {selectedAnswer !== null && (typingComplete || selectedAnswer === correctAnswer) && (
+            <button
+              onClick={() => {
+                setSelectedAnswer(null);
+                setTypedText("");
+                setIsRunning(true);
+              }}
+              className="mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            >
+              Next Question
+            </button>
+          )}
         </div>
       </main >
     </div >
