@@ -115,8 +115,9 @@ export default function Home() {
                 placeholder="Your email address"
                 className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               />
-              <select className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white">
+              <select className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white">
                 <option value="">Select your age group</option>
+                <option value="under-60">Under 60</option>
                 <option value="60-65">60–65</option>
                 <option value="66-70">66–70</option>
                 <option value="71-75">71–75</option>
@@ -181,37 +182,36 @@ export default function Home() {
             ))}
           </div>
 
-          {typedText && (
-            <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
-              {typedText}
-            </p>
-          )}
+          <p className="mt-4 min-h-[72px] text-base text-zinc-700 dark:text-zinc-300">
+            {typedText}
+          </p>
 
-          {selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer) && (
-            <button
-              onClick={() => {
-                const newAnswers = [...answers, {
-                  question: currentQuestion.question,
-                  chosen: selectedAnswer ?? "",
-                  correct: currentQuestion.correctAnswer,
-                }];
-                setAnswers(newAnswers);
+          <button
+            onClick={() => {
+              const newAnswers = [...answers, {
+                question: currentQuestion.question,
+                chosen: selectedAnswer ?? "",
+                correct: currentQuestion.correctAnswer,
+              }];
+              setAnswers(newAnswers);
 
-                if (currentQuestionIndex < questions.length - 1) {
-                  setCurrentQuestionIndex(currentQuestionIndex + 1);
-                  setSelectedAnswer(null);
-                  setTypedText("");
-                  setIsRunning(true);
-                } else {
-                  setQuizComplete(true);
-                  setIsRunning(false);
-                }
-              }}
-              className="mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-            >
-              {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish"}
-            </button>
-          )}
+              if (currentQuestionIndex < questions.length - 1) {
+                setCurrentQuestionIndex(currentQuestionIndex + 1);
+                setSelectedAnswer(null);
+                setTypedText("");
+                setIsRunning(true);
+              } else {
+                setQuizComplete(true);
+                setIsRunning(false);
+              }
+            }}
+            className={`mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 ${selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer)
+              ? "visible"
+              : "invisible"
+              }`}
+          >
+            {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish"}
+          </button>
         </div>
       </main>
     </div>
