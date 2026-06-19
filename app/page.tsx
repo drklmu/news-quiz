@@ -58,107 +58,75 @@ export default function Home() {
   const displaySeconds = roundedSeconds % 60;
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-start gap-8 py-32 px-16 bg-white dark:bg-black">
+        <div className="flex flex-col items-center gap-6 text-center">
           <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
             Daily News Quiz
           </h1>
-          <p className="max-w-md text-lg text-zinc-600 dark:text-zinc-400">
-            Test your memory of yesterday's news
-          </p><div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                Question 1 of 5
-              </p>
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                ⏱ {minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`}
-              </p>
-            </div>
-            <h2 className="mb-6 text-xl font-semibold text-black dark:text-zinc-50">
-              Which city hosted yesterday's big climate summit?
-            </h2>
-            <div className="flex flex-col gap-3">
+          <p className="max-w-md text-xl text-zinc-600 dark:text-zinc-400">
+            Test your memory of yesterday&apos;s news
+          </p>
+        </div>
+
+        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              Question {currentQuestionIndex + 1} of {questions.length}
+            </p>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              ⏱ {minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`}
+            </p>
+          </div>
+
+          <h2 className="mb-6 text-xl font-semibold text-black dark:text-zinc-50">
+            {currentQuestion.question}
+          </h2>
+
+          <div className="flex flex-col gap-3">
+            {currentQuestion.choices.map((choice) => (
               <button
+                key={choice}
                 onClick={() => {
-                  setSelectedAnswer("Paris");
+                  setSelectedAnswer(choice);
                   setIsRunning(false);
                 }}
                 className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
                   ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Paris" === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
+                  : choice === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
                     ? "border-green-500 bg-green-50 dark:bg-green-950"
-                    : selectedAnswer === "Paris"
+                    : selectedAnswer === choice
                       ? "border-red-500 bg-red-50 dark:bg-red-950"
                       : "border-zinc-200 opacity-50"
-                  }`}>
-                Paris
+                  }`}
+              >
+                {choice}
               </button>
-              <button
-                onClick={() => {
-                  setSelectedAnswer("Tokyo");
-                  setIsRunning(false);
-                }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
-                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Tokyo" === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
-                    ? "border-green-500 bg-green-50 dark:bg-green-950"
-                    : selectedAnswer === "Tokyo"
-                      ? "border-red-500 bg-red-50 dark:bg-red-950"
-                      : "border-zinc-200 opacity-50"
-                  }`}>
-                Tokyo
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedAnswer("Berlin");
-                  setIsRunning(false);
-                }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
-                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Berlin" === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
-                    ? "border-green-500 bg-green-50 dark:bg-green-950"
-                    : selectedAnswer === "Berlin"
-                      ? "border-red-500 bg-red-50 dark:bg-red-950"
-                      : "border-zinc-200 opacity-50"
-                  }`}>
-                Berlin
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedAnswer("Nairobi");
-                  setIsRunning(false);
-                }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
-                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : "Nairobi" === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
-                    ? "border-green-500 bg-green-50 dark:bg-green-950"
-                    : selectedAnswer === "Nairobi"
-                      ? "border-red-500 bg-red-50 dark:bg-red-950"
-                      : "border-zinc-200 opacity-50"
-                  }`}>
-                Nairobi
-              </button>
-            </div>
-          </div>{typedText && (
+            ))}
+          </div>
+
+          {typedText && (
             <p className="mt-4 text-base text-zinc-700 dark:text-zinc-300">
               {typedText}
             </p>
           )}
+
           {selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer) && (
             <button
               onClick={() => {
+                if (currentQuestionIndex < questions.length - 1) {
+                  setCurrentQuestionIndex(currentQuestionIndex + 1);
+                }
                 setSelectedAnswer(null);
                 setTypedText("");
                 setIsRunning(true);
               }}
               className="mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
             >
-              Next Question
+              {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish"}
             </button>
           )}
         </div>
-      </main >
-    </div >
+      </main>
+    </div>
   );
 }
