@@ -1,10 +1,15 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { supabase } from "./supabase";
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
   const [quizComplete, setQuizComplete] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [ageGroup, setAgeGroup] = useState("");
+  const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const questions = [
     {
@@ -108,14 +113,22 @@ export default function Home() {
               <input
                 type="text"
                 placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               />
               <input
                 type="email"
                 placeholder="Your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               />
-              <select className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white">
+              <select
+                value={ageGroup}
+                onChange={(e) => setAgeGroup(e.target.value)}
+                className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              >
                 <option value="">Select your age group</option>
                 <option value="under-60">Under 60</option>
                 <option value="60-65">60–65</option>
@@ -124,8 +137,24 @@ export default function Home() {
                 <option value="76-80">76–80</option>
                 <option value="81+">81+</option>
               </select>
-              <button className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
-                Send me my ranking tonight
+              <button
+                onClick={async () => {
+                  setSignupStatus("submitting");
+
+                  const { error } = await supabase
+                    .from("signups")
+                    .insert({ name: name, email: email, age_group: ageGroup });
+
+                  if (error) {
+                    setSignupStatus("error");
+                  } else {
+                    setSignupStatus("success");
+                  }
+                }}
+                disabled={signupStatus === "submitting" || signupStatus === "success"}
+                className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50"
+              >
+                {signupStatus === "submitting" ? "Saving..." : signupStatus === "success" ? "You're signed up! ✓" : "Send me my ranking tonight"}
               </button>
             </div>
           </div>
