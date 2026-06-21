@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
+import { getYesterdaysNews } from "./news";
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
@@ -10,6 +11,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [newsArticles, setNewsArticles] = useState<any[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const questions = [
     {
@@ -60,6 +62,12 @@ export default function Home() {
 
     return () => clearInterval(typingInterval);
   }, [selectedAnswer]);
+  useEffect(() => {
+    getYesterdaysNews().then((articles) => {
+      setNewsArticles(articles);
+      console.log(articles);
+    });
+  }, []);
   const roundedSeconds = Math.floor(seconds / 10) * 10;
   const minutes = Math.floor(roundedSeconds / 60);
   const displaySeconds = roundedSeconds % 60;
