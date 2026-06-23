@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import { getYesterdaysNews } from "./news";
+import { generateQuizFromArticles } from "./generateQuiz";
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
@@ -13,30 +14,12 @@ export default function Home() {
   const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [newsArticles, setNewsArticles] = useState<any[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const questions = [
-    {
-      question: "Which city hosted yesterday's big climate summit?",
-      choices: ["Paris", "Tokyo", "Berlin", "Nairobi"],
-      correctAnswer: "Nairobi",
-      explanation: "Nairobi hosted the UN Climate Summit, bringing together leaders from across Africa and beyond.",
-    },
-    {
-      question: "Which company announced a major product launch yesterday?",
-      choices: ["Apple", "Samsung", "Google", "Microsoft"],
-      correctAnswer: "Apple",
-      explanation: "Apple unveiled its newest device at a press event, drawing significant media attention.",
-    },
-    {
-      question: "Which sport saw a record-breaking performance yesterday?",
-      choices: ["Tennis", "Swimming", "Athletics", "Cycling"],
-      correctAnswer: "Swimming",
-      explanation: "A swimmer broke a world record at an international competition held yesterday.",
-    },
-  ];
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const questions = quizQuestions;
   const currentQuestion = questions[currentQuestionIndex];
   const [typedText, setTypedText] = useState("");
-  const typingComplete = typedText.length === currentQuestion.explanation.length;
-  const [seconds, setSeconds] = useState(0);
+  const typingComplete = currentQuestion ? typedText.length === currentQuestion.explanation.length : false; const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   useEffect(() => {
     if (!isRunning) return;
@@ -63,14 +46,32 @@ export default function Home() {
     return () => clearInterval(typingInterval);
   }, [selectedAnswer]);
   useEffect(() => {
-    getYesterdaysNews().then((articles) => {
+    getYesterdaysNews().then(async (articles) => {
       setNewsArticles(articles);
-      console.log(articles);
+      const generated = await generateQuizFromArticles(articles);
+      setQuizQuestions(generated);
+      setIsLoading(false);
     });
   }, []);
   const roundedSeconds = Math.floor(seconds / 10) * 10;
   const minutes = Math.floor(roundedSeconds / 60);
   const displaySeconds = roundedSeconds % 60;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+        <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-center gap-4 py-32 px-16 bg-white dark:bg-black">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-black dark:text-zinc-50 mb-3">
+              Preparing today&apos;s quiz...
+            </h1>
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Reading the latest news and generating your questions
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
   if (quizComplete) {
     const score = answers.filter(a => a.chosen === a.correct).length;
     const totalTime = minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`;
@@ -198,7 +199,7 @@ export default function Home() {
           </h2>
 
           <div className="flex flex-col gap-3">
-            {currentQuestion.choices.map((choice) => (
+            {currentQuestion.choices.map((choice: string) => (
               <button
                 key={choice}
                 onClick={() => {
