@@ -10,7 +10,12 @@ const supabase = createClient(
 );
 
 function getTodayDate() {
-    return new Date().toISOString().split("T")[0];
+    return new Date().toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
 }
 
 async function generateQuestion(headline: string, body: string) {
@@ -49,10 +54,36 @@ export async function GET() {
     const allArticles: any[] = [];
 
     for (const section of sections) {
-        const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=5&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
+        const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=4&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
         const response = await fetch(url);
         const data = await response.json();
         allArticles.push(...data.response.results.filter((a: any) => a.type !== "liveblog"));
+    }
+
+    const rssFeeds = [
+        "https://feeds.npr.org/1002/rss.xml",
+        "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "https://www.cbsnews.com/latest/rss/main",
+    ];
+
+    const Parser = (await import("rss-parser")).default;
+    const parser = new Parser();
+
+    for (const feedUrl of rssFeeds) {
+        try {
+            const feed = await parser.parseURL(feedUrl);
+            const items = feed.items.slice(0, 4).map((item: any) => ({
+                webTitle: item.title || "",
+                fields: {
+                    bodyText: item.contentSnippet || item.content || item.summary || "",
+                    trailText: item.contentSnippet || item.summary || "",
+                },
+                source: feed.title || feedUrl,
+            }));
+            allArticles.push(...items);
+        } catch (error) {
+            console.error("RSS feed error for " + feedUrl + ":", error);
+        }
     }
 
     const shuffled = allArticles.sort(() => Math.random() - 0.5);
