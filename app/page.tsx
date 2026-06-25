@@ -2,8 +2,6 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
-import { getYesterdaysNews } from "./news";
-import { generateQuizFromArticles } from "./generateQuiz";
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
@@ -12,7 +10,6 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [newsArticles, setNewsArticles] = useState<any[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,12 +43,12 @@ export default function Home() {
     return () => clearInterval(typingInterval);
   }, [selectedAnswer]);
   useEffect(() => {
-    getYesterdaysNews().then(async (articles) => {
-      setNewsArticles(articles);
-      const generated = await generateQuizFromArticles(articles);
-      setQuizQuestions(generated);
-      setIsLoading(false);
-    });
+    fetch("/api/daily-quiz")
+      .then((res) => res.json())
+      .then((data) => {
+        setQuizQuestions(data.questions);
+        setIsLoading(false);
+      });
   }, []);
   const roundedSeconds = Math.floor(seconds / 10) * 10;
   const minutes = Math.floor(roundedSeconds / 60);
