@@ -47,8 +47,8 @@ async function generateQuestion(headline: string, body: string, source: string) 
     const cleaned = content.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const quizData = JSON.parse(cleaned);
 
-    const bannedInQuestion = ["the article", "the story", "the headline", "the text", "this news story", "described in this", "mentioned in this"];
-    const bannedInExplanation = ["the article", "the headline and", "the text", "clearly state", "explicitly state"];
+    const bannedInQuestion = ["the article", "the story", "the headline", "the text", "this news story", "described in this", "mentioned in this", "£"];
+    const bannedInExplanation = ["the article", "the headline and", "the text", "clearly state", "explicitly state", "explicitly states", "states that", "the report states"];
     const questionLower = quizData.question.toLowerCase();
     const explanationLower = quizData.explanation.toLowerCase();
     const choicesText = quizData.choices.join(" ").toLowerCase();
@@ -78,10 +78,10 @@ export async function GET() {
     }
 
     const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setDate(yesterday.getDate() - 2);
     yesterday.setHours(0, 0, 0, 0);
 
-    const sections = ["world", "us-news", "business", "technology", "sport"];
+    const sections = ["world", "us-news", "business", "technology"];
     const allArticles: any[] = [];
 
     for (const section of sections) {
@@ -118,7 +118,7 @@ export async function GET() {
                     const pubDate = new Date(item.pubDate || item.isoDate);
                     return pubDate >= yesterday;
                 })
-                .slice(0, 4)
+                .slice(0, 6)
                 .map((item: any) => ({
                     webTitle: item.title || "",
                     fields: {
@@ -133,15 +133,39 @@ export async function GET() {
         }
     }
 
-    const shuffled = allArticles.sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, 15);
+    const scoredArticles = allArticles.map((article: any) => {
+        const title = (article.webTitle || "").toLowerCase();
+        const titleWords = title.split(" ").filter((w: string) => w.length > 4);
+
+        let score = 0;
+        for (const other of allArticles) {
+            if (other === article) continue;
+            const otherTitle = (other.webTitle || "").toLowerCase();
+            const matches = titleWords.filter((w: string) => otherTitle.includes(w)).length;
+            if (matches >= 2) score++;
+        }
+
+        return { ...article, relevanceScore: score };
+    });
+
+    scoredArticles.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+    const selected = scoredArticles.slice(0, 15);
 
     const results = await Promise.all(
         selected.map(async (article: any) => {
             const bodyContent = article.fields?.bodyText || article.fields?.trailText || "";
-            if (bodyContent.includes("£") || article.webTitle.includes("£")) return null;
+            const title = article.webTitle || "";
+
+            if (bodyContent.includes("£") || title.includes("£")) return null;
+
+            const yearPattern = /\b(19|20)\d{2}\b/g;
+            const yearsInTitle = title.match(yearPattern) || [];
+            const currentYear = new Date().getFullYear();
+            const hasOldYear = yearsInTitle.some((y: string) => parseInt(y) < currentYear - 1);
+            if (hasOldYear) return null;
+
             return await generateQuestion(
-                article.webTitle,
+                title,
                 bodyContent,
                 article.source || "The Guardian"
             );
