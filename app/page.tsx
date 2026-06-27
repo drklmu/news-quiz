@@ -53,7 +53,29 @@ export default function Home() {
   const roundedSeconds = Math.floor(seconds / 10) * 10;
   const minutes = Math.floor(roundedSeconds / 60);
   const displaySeconds = roundedSeconds % 60;
+  const clampToSentences = (text: string, maxChars: number) => {
+    if (text.length <= maxChars) return text;
+    const truncated = text.slice(0, maxChars);
+    const lastPeriod = Math.max(
+      truncated.lastIndexOf(". "),
+      truncated.lastIndexOf("! "),
+      truncated.lastIndexOf("? ")
+    );
+    if (lastPeriod === -1) return "";
+    return truncated.slice(0, lastPeriod + 1);
+  };
   if (isLoading) {
+    const clampToSentences = (text: string, maxChars: number) => {
+      if (text.length <= maxChars) return text;
+      const truncated = text.slice(0, maxChars);
+      const lastPeriod = Math.max(
+        truncated.lastIndexOf(". "),
+        truncated.lastIndexOf("! "),
+        truncated.lastIndexOf("? ")
+      );
+      if (lastPeriod === -1) return "";
+      return truncated.slice(0, lastPeriod + 1);
+    };
     return (
       <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
         <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-center gap-4 py-32 px-16 bg-white dark:bg-black">
@@ -217,8 +239,8 @@ export default function Home() {
             ))}
           </div>
 
-          <p className="mt-4 min-h-[72px] text-base text-zinc-700 dark:text-zinc-300">
-            {typedText}
+          <p className="mt-4 h-[192px] overflow-hidden text-base text-zinc-700 dark:text-zinc-300">
+            {clampToSentences(typedText, 450)}
           </p>
 
           <button
