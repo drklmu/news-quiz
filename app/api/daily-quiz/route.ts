@@ -18,13 +18,13 @@ function getTodayDate() {
     }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
 }
 
-async function generateQuestion(headline: string, body: string, source: string) {
+async function generateQuestion(headline: string, body: string, source: string, pubDate: string) {
     const bodyText = typeof body === "string" ? body.slice(0, 1000) : "";
 
     const rules = [
-        "1) Ask directly about the news event. NEVER use phrases like According to, Based on, In this article, In this news story, or ANY reference to an article or story.",
+        "1) Ask directly about the news event in the QUESTION field. NEVER use phrases like According to, Based on, In this article, In this news story in the question. This rule applies ONLY to the question, NOT the explanation.",
         "2) Keep explanation to maximum 2 sentences.",
-        "3) Start the explanation with exactly: According to " + source + ",",
+        "3) Start the explanation with exactly: According to " + source + " (" + pubDate + "),",
         "4) NEVER use bare references like the article, the story, the headline, the text without naming the source. Always say a " + source + " article or a " + source + " report.",
         "5) If referencing an expert or quote, say an expert quoted in a " + source + " report.",
         "6) NEVER include pound signs or British pounds in any answer choice.",
@@ -33,8 +33,7 @@ async function generateQuestion(headline: string, body: string, source: string) 
         "9) If the article is primarily about UK domestic politics, frame it from an international perspective."
     ].join(" ");
 
-    const userPrompt = "Generate a quiz question for US seniors about this news from " + source + ". Headline: " + headline + " Text: " + bodyText + " Reply with ONLY this JSON: {\"question\": \"?\", \"choices\": [\"Correct\", \"Wrong1\", \"Wrong2\", \"Wrong3\"], \"correctAnswer\": \"Correct\", \"explanation\": \"According to " + source + ", [context and reasoning], which is why the correct answer is [answer].\"} RULES: " + rules;
-
+    const userPrompt = "Generate a quiz question for US seniors about this news from " + source + " published on " + pubDate + ". Headline: " + headline + " Text: " + bodyText + " Reply with ONLY this JSON: {\"question\": \"?\", \"choices\": [\"Correct\", \"Wrong1\", \"Wrong2\", \"Wrong3\"], \"correctAnswer\": \"Correct\", \"explanation\": \"According to " + source + " (" + pubDate + "), FILL IN CONTEXT HERE. The correct answer is FILL IN ANSWER HERE.\"} RULES: " + rules;
     const message = await anthropic.messages.create({
         model: "claude-haiku-4-5",
         max_tokens: 1024,
@@ -46,6 +45,12 @@ async function generateQuestion(headline: string, body: string, source: string) 
 
     const cleaned = content.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const quizData = JSON.parse(cleaned);
+    if (quizData.explanation) {
+        quizData.explanation = quizData.explanation.replace(
+            /^According to [^()\n]+?,\s*/i,
+            "According to " + source + " (" + pubDate + "), "
+        );
+    }
 
     const bannedInQuestion = ["the article", "the story", "the headline", "the text", "this news story", "described in this", "mentioned in this", "£"];
     const bannedInExplanation = ["the article", "the headline and", "the text", "clearly state", "explicitly state", "explicitly states", "states that", "the report states"];
@@ -127,6 +132,7 @@ export async function GET() {
                         trailText: item.contentSnippet || item.summary || "",
                     },
                     source: feed.name,
+                    pubDate: item.isoDate || item.pubDate || null,
                 }));
             allArticles.push(...items);
         } catch (error) {
@@ -165,10 +171,21 @@ export async function GET() {
             const hasOldYear = yearsInTitle.some((y: string) => parseInt(y) < currentYear - 1);
             if (hasOldYear) return null;
 
+
+            const rawDate = article.webPublicationDate || article.pubDate || article.isoDate || null;
+            const articleDate = rawDate
+                ? new Date(rawDate).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                    timeZone: "America/New_York",
+                })
+                : "recently";
             return await generateQuestion(
                 title,
                 bodyContent,
-                article.source || "The Guardian"
+                article.source || "The Guardian",
+                articleDate
             );
         })
     );
