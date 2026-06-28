@@ -85,7 +85,7 @@ export async function GET() {
     const allArticles: any[] = [];
 
     for (const section of sections) {
-        const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=4&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
+        const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=2&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -104,6 +104,7 @@ export async function GET() {
         { url: "https://feeds.npr.org/1002/rss.xml", name: "NPR" },
         { url: "https://www.pbs.org/newshour/feeds/rss/headlines", name: "PBS NewsHour" },
         { url: "https://www.cbsnews.com/latest/rss/main", name: "CBS News" },
+        { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", name: "The New York Times" },
     ];
 
     const Parser = (await import("rss-parser")).default;
