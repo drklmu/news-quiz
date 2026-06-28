@@ -34,6 +34,7 @@ async function generateQuestion(headline: string, body: string, source: string, 
     ].join(" ");
 
     const userPrompt = "Generate a quiz question for US seniors about this news from " + source + " published on " + pubDate + ". Headline: " + headline + " Text: " + bodyText + " Reply with ONLY this JSON: {\"question\": \"?\", \"choices\": [\"Correct\", \"Wrong1\", \"Wrong2\", \"Wrong3\"], \"correctAnswer\": \"Correct\", \"explanation\": \"According to " + source + " (" + pubDate + "), FILL IN CONTEXT HERE. The correct answer is FILL IN ANSWER HERE.\"} RULES: " + rules;
+
     const message = await anthropic.messages.create({
         model: "claude-haiku-4-5",
         max_tokens: 1024,
@@ -45,6 +46,7 @@ async function generateQuestion(headline: string, body: string, source: string, 
 
     const cleaned = content.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const quizData = JSON.parse(cleaned);
+
     if (quizData.explanation) {
         quizData.explanation = quizData.explanation.replace(
             /^According to [^()\n]+?,\s*/i,
@@ -82,9 +84,21 @@ export async function GET() {
         return NextResponse.json({ questions: existing.questions });
     }
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 2);
+    const now = new Date();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
+    yesterday.setMinutes(0);
+    yesterday.setSeconds(0);
+
+    const endOfYesterday = new Date(now);
+    endOfYesterday.setDate(endOfYesterday.getDate() - 1);
+    endOfYesterday.setHours(23, 59, 59, 999);
+
+    const twoDaysAgo = new Date(now);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    twoDaysAgo.setHours(0, 0, 0, 0);
 
     const sections = ["world", "us-news", "business", "technology"];
     const allArticles: any[] = [];
@@ -98,7 +112,7 @@ export async function GET() {
             .filter((a: any) => {
                 if (a.type === "liveblog") return false;
                 const pubDate = new Date(a.webPublicationDate);
-                return pubDate >= yesterday;
+                return pubDate >= yesterday && pubDate <= endOfYesterday;
             })
             .map((a: any) => ({ ...a, source: "The Guardian" }));
 
@@ -122,7 +136,7 @@ export async function GET() {
                 .filter((item: any) => {
                     if (!item.pubDate && !item.isoDate) return true;
                     const pubDate = new Date(item.pubDate || item.isoDate);
-                    return pubDate >= yesterday;
+                    return pubDate >= yesterday && pubDate <= endOfYesterday;
                 })
                 .slice(0, 6)
                 .map((item: any) => ({
@@ -156,7 +170,24 @@ export async function GET() {
     });
 
     scoredArticles.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
-    const selected = scoredArticles.slice(0, 15);
+
+    const selected: any[] = [];
+    for (const article of scoredArticles) {
+        const title = (article.webTitle || "").toLowerCase();
+        const titleWords = title.split(" ").filter((w: string) => w.length > 5);
+
+        const isDuplicate = selected.some((chosen: any) => {
+            const chosenTitle = (chosen.webTitle || "").toLowerCase();
+            const matches = titleWords.filter((w: string) => chosenTitle.includes(w)).length;
+            return matches >= 3;
+        });
+
+        if (!isDuplicate) {
+            selected.push(article);
+        }
+
+        if (selected.length >= 15) break;
+    }
 
     const results = await Promise.all(
         selected.map(async (article: any) => {
@@ -171,7 +202,6 @@ export async function GET() {
             const hasOldYear = yearsInTitle.some((y: string) => parseInt(y) < currentYear - 1);
             if (hasOldYear) return null;
 
-
             const rawDate = article.webPublicationDate || article.pubDate || article.isoDate || null;
             const articleDate = rawDate
                 ? new Date(rawDate).toLocaleDateString("en-US", {
@@ -181,6 +211,7 @@ export async function GET() {
                     timeZone: "America/New_York",
                 })
                 : "recently";
+
             return await generateQuestion(
                 title,
                 bodyContent,
@@ -190,7 +221,46 @@ export async function GET() {
         })
     );
 
-    const validQuestions = results.filter((q) => q !== null).slice(0, 10);
+    let validQuestions = results.filter((q) => q !== null).slice(0, 10);
+
+    if (validQuestions.length < 10) {
+        const fallbackArticles: any[] = [];
+
+        for (const section of sections) {
+            const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=2&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
+            const response = await fetch(url);
+            const data = await response.json();
+            const filtered = data.response.results
+                .filter((a: any) => {
+                    if (a.type === "liveblog") return false;
+                    const pubDate = new Date(a.webPublicationDate);
+                    return pubDate >= twoDaysAgo && pubDate < yesterday;
+                })
+                .map((a: any) => ({ ...a, source: "The Guardian" }));
+            fallbackArticles.push(...filtered);
+        }
+
+        const fallbackResults = await Promise.all(
+            fallbackArticles.slice(0, 10 - validQuestions.length + 2).map(async (article: any) => {
+                const bodyContent = article.fields?.bodyText || article.fields?.trailText || "";
+                if (bodyContent.includes("£") || article.webTitle.includes("£")) return null;
+                const rawDate = article.webPublicationDate || null;
+                const articleDate = rawDate ? new Date(rawDate).toLocaleDateString("en-US", {
+                    month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York",
+                }) : "recently";
+                const titleWords = (article.webTitle || "").toLowerCase().split(" ").filter((w: string) => w.length > 5);
+                const isDuplicate = validQuestions.some((q: any) => {
+                    const qTitle = (q.question || "").toLowerCase();
+                    return titleWords.filter((w: string) => qTitle.includes(w)).length >= 2;
+                });
+                if (isDuplicate) return null;
+                return await generateQuestion(article.webTitle, bodyContent, "The Guardian", articleDate);
+            })
+        );
+
+        const fallbackValid = fallbackResults.filter((q) => q !== null);
+        validQuestions = [...validQuestions, ...fallbackValid].slice(0, 10);
+    }
 
     await supabase
         .from("daily_quiz")
