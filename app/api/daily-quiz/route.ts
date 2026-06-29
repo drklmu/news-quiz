@@ -96,6 +96,10 @@ export async function GET() {
     endOfYesterday.setDate(endOfYesterday.getDate() - 1);
     endOfYesterday.setHours(23, 59, 59, 999);
 
+    const threeDaysAgo = new Date(now);
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    threeDaysAgo.setHours(0, 0, 0, 0);
+
     const twoDaysAgo = new Date(now);
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
     twoDaysAgo.setHours(0, 0, 0, 0);
@@ -112,7 +116,7 @@ export async function GET() {
             .filter((a: any) => {
                 if (a.type === "liveblog") return false;
                 const pubDate = new Date(a.webPublicationDate);
-                return pubDate >= yesterday && pubDate <= endOfYesterday;
+                return pubDate >= threeDaysAgo;
             })
             .map((a: any) => ({ ...a, source: "The Guardian" }));
 
@@ -136,7 +140,7 @@ export async function GET() {
                 .filter((item: any) => {
                     if (!item.pubDate && !item.isoDate) return true;
                     const pubDate = new Date(item.pubDate || item.isoDate);
-                    return pubDate >= yesterday && pubDate <= endOfYesterday;
+                    return pubDate >= threeDaysAgo;
                 })
                 .slice(0, 6)
                 .map((item: any) => ({
@@ -260,6 +264,10 @@ export async function GET() {
 
         const fallbackValid = fallbackResults.filter((q) => q !== null);
         validQuestions = [...validQuestions, ...fallbackValid].slice(0, 10);
+    }
+
+    if (validQuestions.length === 0) {
+        return NextResponse.json({ error: "No questions generated" }, { status: 500 });
     }
 
     await supabase
