@@ -44,7 +44,11 @@ async function generateQuestion(headline: string, body: string, source: string, 
     const content = message.content[0];
     if (content.type !== "text") throw new Error("Unexpected response");
 
-    const cleaned = content.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const cleaned = content.text
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .replace(/[\x00-\x1F\x7F]/g, " ")
+        .trim();
     const quizData = JSON.parse(cleaned);
 
     if (quizData.explanation) {
@@ -86,42 +90,13 @@ export async function GET() {
 
     const now = new Date();
 
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    yesterday.setMinutes(0);
-    yesterday.setSeconds(0);
-
-    const endOfYesterday = new Date(now);
-    endOfYesterday.setDate(endOfYesterday.getDate() - 1);
-    endOfYesterday.setHours(23, 59, 59, 999);
-
     const threeDaysAgo = new Date(now);
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     threeDaysAgo.setHours(0, 0, 0, 0);
 
-    const twoDaysAgo = new Date(now);
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    twoDaysAgo.setHours(0, 0, 0, 0);
+    const todayString = getTodayDate();
 
-    const sections = ["world", "us-news", "business", "technology"];
     const allArticles: any[] = [];
-
-    for (const section of sections) {
-        const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=2&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        const guardianFiltered = data.response.results
-            .filter((a: any) => {
-                if (a.type === "liveblog") return false;
-                const pubDate = new Date(a.webPublicationDate);
-                return pubDate >= threeDaysAgo;
-            })
-            .map((a: any) => ({ ...a, source: "The Guardian" }));
-
-        allArticles.push(...guardianFiltered);
-    }
 
     const rssFeeds = [
         { url: "https://feeds.npr.org/1002/rss.xml", name: "NPR" },
@@ -140,9 +115,13 @@ export async function GET() {
                 .filter((item: any) => {
                     if (!item.pubDate && !item.isoDate) return true;
                     const pubDate = new Date(item.pubDate || item.isoDate);
-                    return pubDate >= threeDaysAgo;
+                    const pubDateString = pubDate.toLocaleDateString("en-US", {
+                        timeZone: "America/New_York",
+                        year: "numeric", month: "2-digit", day: "2-digit"
+                    }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
+                    return pubDate >= threeDaysAgo && pubDateString < todayString;
                 })
-                .slice(0, 6)
+                .slice(0, 8)
                 .map((item: any) => ({
                     webTitle: item.title || "",
                     fields: {
@@ -157,6 +136,8 @@ export async function GET() {
             console.error("RSS feed error for " + feed.url + ":", error);
         }
     }
+
+    console.log("Total articles:", allArticles.length);
 
     const scoredArticles = allArticles.map((article: any) => {
         const title = (article.webTitle || "").toLowerCase();
@@ -183,7 +164,7 @@ export async function GET() {
         const isDuplicate = selected.some((chosen: any) => {
             const chosenTitle = (chosen.webTitle || "").toLowerCase();
             const matches = titleWords.filter((w: string) => chosenTitle.includes(w)).length;
-            return matches >= 3;
+            return matches >= 2;
         });
 
         if (!isDuplicate) {
@@ -200,71 +181,30 @@ export async function GET() {
 
             if (bodyContent.includes("£") || title.includes("£")) return null;
 
+            const roundupWords = ["developments", "updates", "roundup", "briefing", "wrap", "latest", "live", "recap", "highlights", "newsletter"];
+            if (roundupWords.some((w: string) => title.toLowerCase().includes(w))) return null;
+
             const yearPattern = /\b(19|20)\d{2}\b/g;
             const yearsInTitle = title.match(yearPattern) || [];
             const currentYear = new Date().getFullYear();
             const hasOldYear = yearsInTitle.some((y: string) => parseInt(y) < currentYear - 1);
             if (hasOldYear) return null;
 
-            const rawDate = article.webPublicationDate || article.pubDate || article.isoDate || null;
-            const articleDate = rawDate
-                ? new Date(rawDate).toLocaleDateString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    timeZone: "America/New_York",
-                })
-                : "recently";
+            const rawDate = article.pubDate || article.isoDate || null;
+            const articleDate = rawDate ? new Date(rawDate).toLocaleDateString("en-US", {
+                month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York",
+            }) : "recently";
 
             return await generateQuestion(
                 title,
                 bodyContent,
-                article.source || "The Guardian",
+                article.source || "NPR",
                 articleDate
             );
         })
     );
 
-    let validQuestions = results.filter((q) => q !== null).slice(0, 10);
-
-    if (validQuestions.length < 10) {
-        const fallbackArticles: any[] = [];
-
-        for (const section of sections) {
-            const url = "https://content.guardianapis.com/search?section=" + section + "&show-fields=headline,trailText,bodyText&page-size=2&order-by=newest&api-key=" + process.env.NEXT_PUBLIC_GUARDIAN_API_KEY;
-            const response = await fetch(url);
-            const data = await response.json();
-            const filtered = data.response.results
-                .filter((a: any) => {
-                    if (a.type === "liveblog") return false;
-                    const pubDate = new Date(a.webPublicationDate);
-                    return pubDate >= twoDaysAgo && pubDate < yesterday;
-                })
-                .map((a: any) => ({ ...a, source: "The Guardian" }));
-            fallbackArticles.push(...filtered);
-        }
-
-        const fallbackResults = await Promise.all(
-            fallbackArticles.slice(0, 10 - validQuestions.length + 2).map(async (article: any) => {
-                const bodyContent = article.fields?.bodyText || article.fields?.trailText || "";
-                if (bodyContent.includes("£") || article.webTitle.includes("£")) return null;
-                const rawDate = article.webPublicationDate || null;
-                const articleDate = rawDate ? new Date(rawDate).toLocaleDateString("en-US", {
-                    month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York",
-                }) : "recently";
-                const titleWords = (article.webTitle || "").toLowerCase().split(" ").filter((w: string) => w.length > 5);
-                const isDuplicate = validQuestions.some((q: any) => {
-                    const qTitle = (q.question || "").toLowerCase();
-                    return titleWords.filter((w: string) => qTitle.includes(w)).length >= 2;
-                });
-                if (isDuplicate) return null;
-                return await generateQuestion(article.webTitle, bodyContent, "The Guardian", articleDate);
-            })
-        );
-
-        const fallbackValid = fallbackResults.filter((q) => q !== null);
-        validQuestions = [...validQuestions, ...fallbackValid].slice(0, 10);
-    }
+    const validQuestions = results.filter((q) => q !== null).slice(0, 10);
 
     if (validQuestions.length === 0) {
         return NextResponse.json({ error: "No questions generated" }, { status: 500 });
