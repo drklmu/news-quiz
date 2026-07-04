@@ -182,14 +182,14 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
             <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-2">
               Compare your results
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
               Sign up to receive your ranking compared to all other quizzers tonight at midnight.
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 h-[220px] overflow-hidden">
               <input
                 type="text"
                 placeholder="Your name"
@@ -255,7 +255,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
               Question {currentQuestionIndex + 1} of {questions.length}
@@ -265,7 +265,7 @@ export default function Home() {
             </p>
           </div>
 
-          <h2 className="mb-6 text-xl font-semibold text-black dark:text-zinc-50">
+          <h2 className="mb-6 h-[120px] overflow-hidden text-xl font-semibold text-black dark:text-zinc-50">
             {currentQuestion.question}
           </h2>
 
@@ -277,7 +277,7 @@ export default function Home() {
                   setSelectedAnswer(choice);
                   setIsRunning(false);
                 }}
-                className={`rounded-xl border px-4 py-3 text-left ${selectedAnswer === null
+                className={`rounded-xl border px-4 py-3 text-left min-h-[48px] max-h-[96px] overflow-hidden ${selectedAnswer === null
                   ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
                   : choice === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
                     ? "border-green-500 bg-green-50 dark:bg-green-950"

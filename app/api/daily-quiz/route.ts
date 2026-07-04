@@ -103,6 +103,7 @@ export async function GET() {
         { url: "https://www.pbs.org/newshour/feeds/rss/headlines", name: "PBS NewsHour" },
         { url: "https://www.cbsnews.com/latest/rss/main", name: "CBS News" },
         { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", name: "The New York Times" },
+        { url: "https://abcnews.go.com/abcnews/usheadlines", name: "ABC News" },
     ];
 
     const Parser = (await import("rss-parser")).default;
@@ -121,7 +122,7 @@ export async function GET() {
                     }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
                     return pubDate >= threeDaysAgo && pubDateString < todayString;
                 })
-                .slice(0, 8)
+                .slice(0, 5)
                 .map((item: any) => ({
                     webTitle: item.title || "",
                     fields: {
@@ -181,7 +182,7 @@ export async function GET() {
 
             if (bodyContent.includes("£") || title.includes("£")) return null;
 
-            const roundupWords = ["developments", "updates", "roundup", "briefing", "wrap", "latest", "live", "recap", "highlights", "newsletter"];
+            const roundupWords = ["developments", "updates", "roundup", "briefing", "wrap", "latest", "live", "recap", "highlights", "newsletter", "one year", "years ago", "anniversary", "look back", "then and now"];
             if (roundupWords.some((w: string) => title.toLowerCase().includes(w))) return null;
 
             const yearPattern = /\b(19|20)\d{2}\b/g;
