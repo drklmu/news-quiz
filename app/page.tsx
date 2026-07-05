@@ -22,6 +22,7 @@ export default function Home() {
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [alreadyPlayed, setAlreadyPlayed] = useState(false);
   const questions = quizQuestions;
   const currentQuestion = questions[currentQuestionIndex];
   const [typedText, setTypedText] = useState("");
@@ -52,6 +53,15 @@ export default function Home() {
     return () => clearInterval(typingInterval);
   }, [selectedAnswer]);
   useEffect(() => {
+    const today = getTodayDate();
+    const alreadyPlayed = localStorage.getItem("lastPlayedDate");
+
+    if (alreadyPlayed === today) {
+      setAlreadyPlayed(true);
+      setIsLoading(false);
+      return;
+    }
+
     fetch("/api/daily-quiz")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load quiz");
@@ -104,6 +114,25 @@ export default function Home() {
             </h1>
             <p className="text-zinc-500 dark:text-zinc-400">
               Reading the latest news and generating your questions
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+  if (alreadyPlayed) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+        <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-center gap-6 py-32 px-16 bg-white dark:bg-black">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-black dark:text-zinc-50 mb-3">
+              You&apos;ve already played today!
+            </h1>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-2">
+              Come back tomorrow for a fresh set of questions.
+            </p>
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Check your email tonight for your ranking results.
             </p>
           </div>
         </main>
@@ -327,6 +356,7 @@ export default function Home() {
               } else {
                 setQuizComplete(true);
                 setIsRunning(false);
+                localStorage.setItem("lastPlayedDate", getTodayDate());
               }
             }}
             className={`mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 ${selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer)
