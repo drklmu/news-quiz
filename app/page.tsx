@@ -2,6 +2,14 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
+function getTodayDate() {
+  return new Date().toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
+}
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
@@ -221,9 +229,16 @@ export default function Home() {
                 onClick={async () => {
                   setSignupStatus("submitting");
 
+                  const score = answers.filter(a => a.chosen === a.correct).length;
                   const { error } = await supabase
                     .from("signups")
-                    .insert({ name: name, email: email, age_group: ageGroup });
+                    .insert({
+                      name: name,
+                      email: email,
+                      age_group: ageGroup,
+                      score: score,
+                      quiz_date: getTodayDate()
+                    });
 
                   if (error) {
                     setSignupStatus("error");
