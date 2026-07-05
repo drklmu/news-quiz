@@ -37,6 +37,9 @@ export async function GET(request: Request) {
 
     const quizDate = getYesterdayDate();
     const today = getTodayDate();
+    const formattedDate = new Date(quizDate + "T12:00:00").toLocaleDateString("en-US", {
+        month: "long", day: "numeric", year: "numeric"
+    });
 
     const { data: signups, error: signupError } = await supabase
         .from("signups")
@@ -63,7 +66,9 @@ export async function GET(request: Request) {
         const userScore = signup.score || 0;
         const scoredBelow = signups.filter((s: any) => (s.score || 0) < userScore).length;
         const percentile = Math.round((scoredBelow / totalParticipants) * 100);
-
+        const rankingMessage = totalParticipants === 1
+            ? "You were today's only quizzer — come back tomorrow to compete!"
+            : "You scored better than " + percentile + "% of today's " + totalParticipants + " quizzers";
         const firstName = (signup.name || "").split(" ")[0] || "there";
 
         const emailHtml = `
@@ -79,7 +84,7 @@ export async function GET(request: Request) {
     
     <div style="background: #000; padding: 32px; text-align: center;">
       <h1 style="color: white; margin: 0; font-size: 24px; font-weight: bold;">Daily News Quiz</h1>
-      <p style="color: #aaa; margin: 8px 0 0 0; font-size: 14px;">Your results for ${quizDate}</p>
+<p style="color: #aaa; margin: 8px 0 0 0; font-size: 14px;">Your results for ${formattedDate}</p>
     </div>
 
     <div style="padding: 32px;">
@@ -95,13 +100,13 @@ export async function GET(request: Request) {
       <div style="background: #000; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
         <p style="margin: 0 0 8px 0; color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Ranking</p>
         <p style="margin: 0; font-size: 48px; font-weight: bold; color: white;">${percentile}<span style="font-size: 24px; color: #aaa;">th percentile</span></p>
-        <p style="margin: 8px 0 0 0; color: #aaa; font-size: 14px;">You scored better than ${percentile}% of today's ${totalParticipants} quizzers</p>
+<p style="margin: 8px 0 0 0; color: #aaa; font-size: 14px;">${rankingMessage}</p>
       </div>
 
       <p style="color: #555; line-height: 1.6;">Come back tomorrow for a fresh set of questions about today's news!</p>
 
       <div style="text-align: center; margin: 32px 0;">
-        <a href="https://news-quiz-tan.vercel.app" style="background: #000; color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Take Tomorrow's Quiz</a>
+        <a href="https://news-quiz-tan.vercel.app" style="background: #000; color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Take Today's Quiz</a>
       </div>
     </div>
 

@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/send-rankings",
-      "schedule": "0 8 * * *"
+      "schedule": "15 11 * * *"
     }
   ]
 }
