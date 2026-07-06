@@ -106,7 +106,7 @@ export async function GET(request: Request) {
       <p style="color: #555; line-height: 1.6;">Come back tomorrow for a fresh set of questions about today's news!</p>
 
       <div style="text-align: center; margin: 32px 0;">
-        <a href="https://news-quiz-tan.vercel.app" style="background: #000; color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Take Today's Quiz</a>
+        <a href="https://quiz.chap2.life" style="background: #000; color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Take Today's Quiz</a>
       </div>
     </div>
 
