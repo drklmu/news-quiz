@@ -104,6 +104,9 @@ export async function GET() {
         { url: "https://www.cbsnews.com/latest/rss/main", name: "CBS News" },
         { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", name: "The New York Times" },
         { url: "https://abcnews.go.com/abcnews/usheadlines", name: "ABC News" },
+        { url: "https://thehill.com/rss/syndicator/19110", name: "The Hill" },
+        { url: "https://feeds.a.dj.com/rss/RSSWorldNews.xml", name: "The Wall Street Journal" },
+        { url: "https://newsnationnow.com/feed", name: "NewsNation" },
     ];
 
     const Parser = (await import("rss-parser")).default;
@@ -122,7 +125,7 @@ export async function GET() {
                     }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
                     return pubDate >= threeDaysAgo && pubDateString < todayString;
                 })
-                .slice(0, 5)
+                .slice(0, 10)
                 .map((item: any) => ({
                     webTitle: item.title || "",
                     fields: {
@@ -132,13 +135,13 @@ export async function GET() {
                     source: feed.name,
                     pubDate: item.isoDate || item.pubDate || null,
                 }));
+
+
             allArticles.push(...items);
         } catch (error) {
             console.error("RSS feed error for " + feed.url + ":", error);
         }
     }
-
-    console.log("Total articles:", allArticles.length);
 
     const scoredArticles = allArticles.map((article: any) => {
         const title = (article.webTitle || "").toLowerCase();
