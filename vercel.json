@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron",
-      "schedule": "0 11 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/send-rankings",
-      "schedule": "15 11 * * *"
+      "schedule": "45 10 * * *"
     }
   ]
 }
