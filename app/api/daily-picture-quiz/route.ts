@@ -52,17 +52,55 @@ export async function GET() {
     }
 
     if (!theme.images_ready || !theme.image_urls) {
-        return NextResponse.json({ error: "Images not ready for today" }, { status: 404 });
+        // Fall back to most recent date with images ready
+        const { data: fallback, error: fallbackError } = await supabase
+            .from("picture_themes")
+            .select("*")
+            .eq("images_ready", true)
+            .not("image_urls", "is", null)
+            .not("choices", "is", null)
+            .order("date_key", { ascending: false })
+            .limit(1)
+            .single();
+
+        if (fallbackError || !fallback) {
+            return NextResponse.json({ error: "No images available yet" }, { status: 404 });
+        }
+
+        // Use fallback theme
+        const imageUrls = fallback.image_urls as string[];
+        const choices = fallback.choices as any[];
+
+        const questions = choices.map((q: any) => ({
+            image_url: q.image_url,
+            answer: q.answer,
+            choices: q.choices,
+        }));
+
+        const cacheData = {
+            quiz_date: today,
+            date_key: fallback.date_key,
+            event_title: fallback.event_title,
+            event_year: fallback.event_year,
+            event_description: fallback.event_description,
+            questions,
+        };
+
+        await supabase.from("picture_quiz_cache").insert(cacheData);
+        return NextResponse.json(cacheData);
     }
 
     // Build questions from image_urls and image_subjects
-    const imageUrls = theme.image_urls as string[];
-    const imageSubjects = theme.image_subjects as string[];
+    const choices = theme.choices as any[];
 
-    const questions = imageUrls.map((url: string, index: number) => ({
-        image: url,
-        answer: imageSubjects[index],
-        choices: generateChoices(imageSubjects[index], imageSubjects),
+    if (!choices) {
+        return NextResponse.json({ error: "Choices not generated yet" }, { status: 404 });
+    }
+
+    const questions = choices.map((q: any) => ({
+        image_url: q.image_url,
+        answer: q.answer,
+        choices: q.choices,
     }));
 
     const cacheData = {
@@ -79,13 +117,4 @@ export async function GET() {
         .insert(cacheData);
 
     return NextResponse.json(cacheData);
-}
-
-function generateChoices(correct: string, allSubjects: string[]): string[] {
-    // Pick 3 wrong answers from other subjects
-    const others = allSubjects.filter(s => s !== correct);
-    const shuffled = others.sort(() => Math.random() - 0.5);
-    const wrong = shuffled.slice(0, 3);
-    // Combine and shuffle
-    return [correct, ...wrong].sort(() => Math.random() - 0.5);
 }
