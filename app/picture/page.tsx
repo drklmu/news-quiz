@@ -4,82 +4,66 @@ import { useState, useEffect, useRef } from "react";
 const TOTAL_SLICES = 16;
 const REVEAL_INTERVAL = 5000;
 
-// Placeholder images for testing - we'll replace these with real Hawaii images
-
-const TEST_QUESTIONS = [
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707980/2026-07-07_01-pineapple_sh8yu8.jpg",
-        answer: "Pineapple",
-        choices: ["Pineapple", "Mango Tree", "Sugar Cane", "Coconut Palm"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707980/2026-07-07_02-beach_y4h7vd.jpg",
-        answer: "Tropical Beach",
-        choices: ["Tropical Beach", "Rocky Desert", "Arctic Tundra", "Mountain Lake"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707980/2026-07-07_03-magnum_pi_st0mgr.jpg",
-        answer: "Magnum P.I.",
-        choices: ["Magnum P.I.", "Miami Vice", "The Rockford Files", "Simon & Simon"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707979/2026-07-07_04-hawaii_flag_p04uyi.jpg",
-        answer: "Hawaiian Flag",
-        choices: ["Hawaiian Flag", "Fijian Flag", "Samoan Flag", "Puerto Rican Flag"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707979/2026-07-07_05-lei_flower_garland_p6bqj6.jpg",
-        answer: "Lei Garland",
-        choices: ["Lei Garland", "Mardi Gras Beads", "Flower Crown", "Marigold Necklace"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707980/2026-07-07_06-ukelele_ldz51d.jpg",
-        answer: "Ukulele",
-        choices: ["Ukulele", "Mandolin", "Banjo", "Balalaika"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707979/2026-07-07_07-hula_dancers_kbav1i.jpg",
-        answer: "Hula Dancers",
-        choices: ["Hula Dancers", "Flamenco Dancers", "Tahitian Dancers", "Balinese Dancers"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707979/2026-07-07_08-iolani_palace_afbrsx.jpg",
-        answer: "Iolani Palace",
-        choices: ["Iolani Palace", "Buckingham Palace", "Palace of Fine Arts", "Governor's Mansion"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707979/2026-07-07_09-hawaii_five-o_o2mhtt.jpg",
-        answer: "Hawaii Five-O",
-        choices: ["Hawaii Five-O", "Baywatch", "NCIS Los Angeles", "The A-Team"],
-    },
-    {
-        image: "https://res.cloudinary.com/chvraqs8/image/upload/v1783707979/2026-07-07_10-shaka_sign_oblbyj.jpg",
-        answer: "Shaka Sign",
-        choices: ["Shaka Sign", "Thumbs Up", "Peace Sign", "Rock On Sign"],
-    },
-];
-
 export default function PictureQuiz() {
+    const [quizData, setQuizData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const [alreadyPlayed, setAlreadyPlayed] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [revealedSlices, setRevealedSlices] = useState<number[]>([]);
     const [sliceOrder, setSliceOrder] = useState<number[]>([]);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-    const [isRunning, setIsRunning] = useState(true);
+    const [isRunning, setIsRunning] = useState(false);
     const [seconds, setSeconds] = useState(0);
     const [quizComplete, setQuizComplete] = useState(false);
     const [answers, setAnswers] = useState<{ correct: boolean }[]>([]);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
 
-    const currentQuestion = TEST_QUESTIONS[currentIndex];
+    function getTodayDate() {
+        return new Date().toLocaleDateString("en-US", {
+            timeZone: "America/New_York",
+            year: "numeric", month: "2-digit", day: "2-digit",
+        }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
+    }
 
-    // Generate random slice order on mount and when question changes
+    // Fetch quiz data
     useEffect(() => {
-        const order = Array.from({ length: TOTAL_SLICES }, (_, i) => i)
-            .sort(() => Math.random() - 0.5);
+        const today = getTodayDate();
+        const played = localStorage.getItem("lastPlayedPictureDate");
+        if (played === today) {
+            setAlreadyPlayed(true);
+            setIsLoading(false);
+            return;
+        }
+
+        fetch("/api/daily-picture-quiz")
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load");
+                return res.json();
+            })
+            .then(data => {
+                if (!data.questions || data.questions.length === 0) throw new Error("No questions");
+                setQuizData(data);
+                setIsLoading(false);
+                setIsRunning(true);
+            })
+            .catch(() => {
+                setLoadError(true);
+                setIsLoading(false);
+            });
+    }, []);
+
+    const questions = quizData?.questions || [];
+    const currentQuestion = questions[currentIndex];
+
+    // Initialize slices when question changes
+    useEffect(() => {
+        if (!currentQuestion) return;
+        const order = Array.from({ length: TOTAL_SLICES }, (_, i) => i).sort(() => Math.random() - 0.5);
         setSliceOrder(order);
         setRevealedSlices([order[0]]);
-    }, [currentIndex]);
+    }, [currentIndex, quizData]);
 
     // Timer
     useEffect(() => {
@@ -88,28 +72,21 @@ export default function PictureQuiz() {
         return () => clearInterval(interval);
     }, [isRunning]);
 
-    // Auto-reveal slices every 5 seconds
+    // Auto-reveal slices
     useEffect(() => {
-        if (!isRunning || selectedAnswer !== null) return;
-
+        if (!isRunning || selectedAnswer !== null || !currentQuestion) return;
         if (revealedSlices.length === 10) {
-            // Failed — reveal all remaining slices at once
             setRevealedSlices(sliceOrder);
             setSelectedAnswer("__timeout__");
             setIsRunning(false);
             return;
         }
-
         if (revealedSlices.length >= TOTAL_SLICES) return;
-
         const timeout = setTimeout(() => {
-            setRevealedSlices(prev => [
-                ...prev,
-                sliceOrder[prev.length]
-            ]);
+            setRevealedSlices(prev => [...prev, sliceOrder[prev.length]]);
         }, REVEAL_INTERVAL);
         return () => clearTimeout(timeout);
-    }, [revealedSlices, isRunning, selectedAnswer, sliceOrder]);
+    }, [revealedSlices, isRunning, selectedAnswer, sliceOrder, currentQuestion]);
 
     // Draw canvas
     useEffect(() => {
@@ -117,21 +94,15 @@ export default function PictureQuiz() {
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-
         const size = canvas.width;
         const cx = size / 2;
         const cy = size / 2;
         const radius = size * 0.72;
-
         ctx.clearRect(0, 0, size, size);
-
-        // Draw black overlay
         ctx.fillStyle = "#000000";
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fill();
-
-        // Cut out revealed slices
         revealedSlices.forEach(sliceIndex => {
             const startAngle = (sliceIndex / TOTAL_SLICES) * Math.PI * 2 - Math.PI / 2;
             const endAngle = ((sliceIndex + 1) / TOTAL_SLICES) * Math.PI * 2 - Math.PI / 2;
@@ -156,12 +127,14 @@ export default function PictureQuiz() {
         const newAnswers = [...answers, { correct: isCorrect }];
         setAnswers(newAnswers);
 
-        if (currentIndex < TEST_QUESTIONS.length - 1) {
+        if (currentIndex < questions.length - 1) {
             setCurrentIndex(currentIndex + 1);
             setSelectedAnswer(null);
             setIsRunning(true);
         } else {
             setQuizComplete(true);
+            setIsRunning(false);
+            localStorage.setItem("lastPlayedPictureDate", getTodayDate());
         }
     };
 
@@ -170,80 +143,72 @@ export default function PictureQuiz() {
     const displaySeconds = seconds % 60;
     const timeDisplay = minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`;
 
+    // Screens
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50 dark:bg-black font-sans">
+                <p className="text-zinc-500 dark:text-zinc-400">Loading today's picture quiz...</p>
+            </div>
+        );
+    }
+
+    if (alreadyPlayed) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50 dark:bg-black font-sans p-8">
+                <div className="text-center">
+                    <h1 className="text-2xl font-semibold text-black dark:text-white mb-3">You've already played today!</h1>
+                    <p className="text-zinc-500 dark:text-zinc-400">Come back tomorrow for a new set of pictures.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50 dark:bg-black font-sans p-8">
+                <div className="text-center">
+                    <h1 className="text-2xl font-semibold text-black dark:text-white mb-3">Something went wrong</h1>
+                    <p className="text-zinc-500 dark:text-zinc-400 mb-6">Could not load today's picture quiz. Try again later.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!currentQuestion && !quizComplete) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50 dark:bg-black font-sans p-8">
+                <div className="text-center">
+                    <h1 className="text-2xl font-semibold text-black dark:text-white mb-3">No pictures available today</h1>
+                    <p className="text-zinc-500 dark:text-zinc-400">Check back tomorrow!</p>
+                </div>
+            </div>
+        );
+    }
+
     if (quizComplete) {
         return (
             <div className="flex flex-col items-center justify-start min-h-screen bg-zinc-50 dark:bg-black font-sans py-16 px-4">
                 <div className="w-full max-w-md flex flex-col gap-6">
-
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold text-black dark:text-white mb-2">
-                            Picture Quiz
-                        </h1>
+                        <h1 className="text-3xl font-bold text-black dark:text-white mb-2">Quiz Complete!</h1>
                         <p className="text-xl text-zinc-500 dark:text-zinc-400">
-                            What do you see?
+                            You scored {score} out of {questions.length} in {timeDisplay}
                         </p>
                     </div>
 
-                    <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col gap-4">
-
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm text-zinc-500">Picture {currentIndex + 1} of {TEST_QUESTIONS.length}</p>
-                            <p className="text-sm text-zinc-500">⏱ {timeDisplay}</p>
-                        </div>
-
-                        {/* Image with reveal overlay */}
-                        <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700">
-                            <img
-                                src={currentQuestion.image}
-                                alt="Quiz image"
-                                className="w-full h-full object-cover"
-                                ref={el => { imageRef.current = el; }}
-                            />
-                            <canvas
-                                ref={canvasRef}
-                                width={600}
-                                height={600}
-                                className="absolute inset-0 w-full h-full"
-                            />
-                        </div>
-
-                        {/* Answer choices */}
-                        <div className="flex flex-col gap-3">
-                            {currentQuestion.choices.map((choice) => (
-                                <button
-                                    key={choice}
-                                    onClick={() => selectedAnswer === null && handleAnswer(choice)}
-                                    className={`rounded-xl border px-4 py-3 text-left transition-colors ${selectedAnswer === null
-                                        ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                                        : choice === currentQuestion.answer
-                                            ? "border-green-500 bg-green-50 dark:bg-green-950"
-                                            : selectedAnswer === choice
-                                                ? "border-red-500 bg-red-50 dark:bg-red-950"
-                                                : "border-zinc-200 opacity-50 dark:border-zinc-700"
-                                        }`}
-                                >
-                                    {choice}
-                                </button>
-                            ))}
-                        </div>
-
-                        {selectedAnswer === "__timeout__" && (
-                            <div className="rounded-xl border border-red-500 bg-red-50 dark:bg-red-950 px-4 py-3 text-center">
-                                <p className="text-red-600 dark:text-red-400 font-medium">⏰ Time's up — no answer selected</p>
-                                <p className="text-red-500 dark:text-red-500 text-sm mt-1">The correct answer was: <strong>{currentQuestion.answer}</strong></p>
-                            </div>
-                        )}
-
-                        {selectedAnswer !== null && (
-                            <button
-                                onClick={handleNext}
-                                className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-                            >
-                                {currentIndex < TEST_QUESTIONS.length - 1 ? "Next Picture" : "See Results"}
-                            </button>
-                        )}
-
+                    <div className="rounded-2xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-800 p-6">
+                        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-2">Today's theme was:</p>
+                        <p className="text-black dark:text-white font-semibold text-lg mb-2">
+                            {quizData?.event_title} ({quizData?.event_year})
+                        </p>
+                        <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+                            {quizData?.event_description}
+                        </p>
                     </div>
+
+                    <a href="/picture" className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-center">
+                        See Tomorrow's Quiz
+                    </a>
                 </div>
             </div>
         );
@@ -254,24 +219,20 @@ export default function PictureQuiz() {
             <div className="w-full max-w-md flex flex-col gap-6">
 
                 <div className="text-center">
-                    <h1 className="text-3xl font-bold text-black dark:text-white mb-2">
-                        Picture Quiz
-                    </h1>
-                    <p className="text-xl text-zinc-500 dark:text-zinc-400">
-                        What do you see?
-                    </p>
+                    <h1 className="text-3xl font-bold text-black dark:text-white mb-2">Picture Quiz</h1>
+                    <p className="text-xl text-zinc-500 dark:text-zinc-400">What do you see?</p>
                 </div>
 
-                <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col gap-4">
+                <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
 
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-zinc-500">Picture {currentIndex + 1} of {TEST_QUESTIONS.length}</p>
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-sm text-zinc-500">Picture {currentIndex + 1} of {questions.length}</p>
                         <p className="text-sm text-zinc-500">⏱ {timeDisplay}</p>
                     </div>
 
-                    <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700">
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 mb-4">
                         <img
-                            src={currentQuestion.image}
+                            src={currentQuestion.image_url}
                             alt="Quiz image"
                             className="w-full h-full object-cover"
                             ref={el => { imageRef.current = el; }}
@@ -285,17 +246,17 @@ export default function PictureQuiz() {
                     </div>
 
                     <div className="flex flex-col gap-3">
-                        {currentQuestion.choices.map((choice) => (
+                        {currentQuestion.choices.map((choice: string) => (
                             <button
                                 key={choice}
                                 onClick={() => selectedAnswer === null && handleAnswer(choice)}
                                 className={`rounded-xl border px-4 py-3 text-left transition-colors ${selectedAnswer === null
-                                    ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                                    : choice === currentQuestion.answer
-                                        ? "border-green-500 bg-green-50 dark:bg-green-950"
-                                        : selectedAnswer === choice
-                                            ? "border-red-500 bg-red-50 dark:bg-red-950"
-                                            : "border-zinc-200 opacity-50 dark:border-zinc-700"
+                                        ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                                        : choice === currentQuestion.answer
+                                            ? "border-green-500 bg-green-50 dark:bg-green-950"
+                                            : selectedAnswer === choice
+                                                ? "border-red-500 bg-red-50 dark:bg-red-950"
+                                                : "border-zinc-200 opacity-50 dark:border-zinc-700"
                                     }`}
                             >
                                 {choice}
@@ -304,20 +265,19 @@ export default function PictureQuiz() {
                     </div>
 
                     {selectedAnswer === "__timeout__" && (
-                        <div className="rounded-xl border border-red-500 bg-red-50 dark:bg-red-950 px-4 py-3 text-center">
-                            <p className="text-red-600 dark:text-red-400 font-medium">⏰ Time's up — no answer selected</p>
-                            <p className="text-red-500 dark:text-red-500 text-sm mt-1">The correct answer was: <strong>{currentQuestion.answer}</strong></p>
+                        <div className="mt-4 rounded-xl border border-red-500 bg-red-50 dark:bg-red-950 px-4 py-3 text-center">
+                            <p className="text-red-600 dark:text-red-400 font-medium">⏰ Time's up!</p>
+                            <p className="text-red-500 text-sm mt-1">The correct answer was: <strong>{currentQuestion.answer}</strong></p>
                         </div>
                     )}
 
-                    {selectedAnswer !== null && (
-                        <button
-                            onClick={handleNext}
-                            className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-                        >
-                            {currentIndex < TEST_QUESTIONS.length - 1 ? "Next Picture" : "See Results"}
-                        </button>
-                    )}
+                    <button
+                        onClick={handleNext}
+                        className={`mt-4 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 ${selectedAnswer !== null ? "visible" : "invisible"
+                            }`}
+                    >
+                        {currentIndex < questions.length - 1 ? "Next Picture" : "See Results"}
+                    </button>
 
                 </div>
             </div>
