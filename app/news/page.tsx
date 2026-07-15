@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
+
 function getTodayDate() {
   return new Date().toLocaleDateString("en-US", {
     timeZone: "America/New_York",
@@ -10,6 +11,7 @@ function getTodayDate() {
     day: "2-digit",
   }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
 }
+
 export default function Home() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ question: string; chosen: string; correct: string }[]>([]);
@@ -23,45 +25,64 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [typedText, setTypedText] = useState("");
+  const [seconds, setSeconds] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+
   const questions = quizQuestions;
   const currentQuestion = questions[currentQuestionIndex];
-  const [typedText, setTypedText] = useState("");
-  const typingComplete = currentQuestion ? typedText.length === currentQuestion.explanation.length : false; const [seconds, setSeconds] = useState(0);
-  const [isRunning, setIsRunning] = useState(true);
+  const typingComplete = currentQuestion ? typedText.length === currentQuestion.explanation.length : false;
+
+  const roundedSeconds = Math.floor(seconds / 10) * 10;
+  const minutes = Math.floor(roundedSeconds / 60);
+  const displaySeconds = roundedSeconds % 60;
+
+  const clampToSentences = (text: string, maxChars: number) => {
+    if (text.length <= maxChars) return text;
+    const truncated = text.slice(0, maxChars);
+    const lastPeriod = Math.max(
+      truncated.lastIndexOf(". "),
+      truncated.lastIndexOf("! "),
+      truncated.lastIndexOf("? ")
+    );
+    if (lastPeriod === -1) return "";
+    return truncated.slice(0, lastPeriod + 1);
+  };
+
+  // Timer
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || !started) return;
     const interval = setInterval(() => {
       setSeconds((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning]);
-  useEffect(() => {
-    if (selectedAnswer === null || selectedAnswer === currentQuestion.correctAnswer) return;
+  }, [isRunning, started]);
 
+  // Typing effect
+  useEffect(() => {
+    if (selectedAnswer === null || selectedAnswer === currentQuestion?.correctAnswer) return;
     setTypedText("");
     let index = 0;
-
     const typingInterval = setInterval(() => {
       index++;
       setTypedText(currentQuestion.explanation.slice(0, index));
-
       if (index >= currentQuestion.explanation.length) {
         clearInterval(typingInterval);
       }
     }, 45);
-
     return () => clearInterval(typingInterval);
   }, [selectedAnswer]);
+
+  // Fetch quiz
   useEffect(() => {
     const today = getTodayDate();
-    const alreadyPlayed = localStorage.getItem("lastPlayedDate");
-
-    if (alreadyPlayed === today) {
+    const alreadyPlayedDate = localStorage.getItem("lastPlayedDate");
+    if (alreadyPlayedDate === today) {
       setAlreadyPlayed(true);
       setIsLoading(false);
       return;
     }
-
     fetch("/api/daily-quiz")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load quiz");
@@ -79,32 +100,8 @@ export default function Home() {
         setLoadError(true);
       });
   }, []);
-  const roundedSeconds = Math.floor(seconds / 10) * 10;
-  const minutes = Math.floor(roundedSeconds / 60);
-  const displaySeconds = roundedSeconds % 60;
-  const clampToSentences = (text: string, maxChars: number) => {
-    if (text.length <= maxChars) return text;
-    const truncated = text.slice(0, maxChars);
-    const lastPeriod = Math.max(
-      truncated.lastIndexOf(". "),
-      truncated.lastIndexOf("! "),
-      truncated.lastIndexOf("? ")
-    );
-    if (lastPeriod === -1) return "";
-    return truncated.slice(0, lastPeriod + 1);
-  };
+
   if (isLoading) {
-    const clampToSentences = (text: string, maxChars: number) => {
-      if (text.length <= maxChars) return text;
-      const truncated = text.slice(0, maxChars);
-      const lastPeriod = Math.max(
-        truncated.lastIndexOf(". "),
-        truncated.lastIndexOf("! "),
-        truncated.lastIndexOf("? ")
-      );
-      if (lastPeriod === -1) return "";
-      return truncated.slice(0, lastPeriod + 1);
-    };
     return (
       <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
         <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-center gap-4 py-32 px-16 bg-white dark:bg-black">
@@ -120,6 +117,7 @@ export default function Home() {
       </div>
     );
   }
+
   if (alreadyPlayed) {
     return (
       <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -139,6 +137,7 @@ export default function Home() {
       </div>
     );
   }
+
   if (loadError) {
     return (
       <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -180,10 +179,10 @@ export default function Home() {
       </div>
     );
   }
+
   if (quizComplete) {
     const score = answers.filter(a => a.chosen === a.correct).length;
     const totalTime = minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`;
-
     return (
       <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
         <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-start gap-8 py-32 px-16 bg-white dark:bg-black">
@@ -195,7 +194,6 @@ export default function Home() {
               You scored {score} out of {questions.length} in {totalTime}
             </p>
           </div>
-
           <div className="w-full max-w-md flex flex-col gap-6">
             {answers.map((answer, index) => (
               <div key={index} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -218,7 +216,6 @@ export default function Home() {
               </div>
             ))}
           </div>
-
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
             <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-2">
               Compare your results
@@ -257,7 +254,6 @@ export default function Home() {
               <button
                 onClick={async () => {
                   setSignupStatus("submitting");
-
                   const score = answers.filter(a => a.chosen === a.correct).length;
                   const { error } = await supabase
                     .from("signups")
@@ -268,7 +264,6 @@ export default function Home() {
                       score: score,
                       quiz_date: getTodayDate()
                     });
-
                   if (error) {
                     setSignupStatus("error");
                   } else {
@@ -282,90 +277,100 @@ export default function Home() {
               </button>
             </div>
           </div>
-
         </main>
       </div>
     );
   }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-start gap-8 py-32 px-16 bg-white dark:bg-black">
-        <div className="flex flex-col items-center gap-6 text-center">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            Daily News Quiz
-          </h1>
-          <p className="max-w-md text-xl text-zinc-600 dark:text-zinc-400">
-            Test your memory of yesterday&apos;s news
-          </p>
+    <div className="flex flex-col flex-1 items-center justify-start bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex flex-1 w-full max-w-md flex-col items-center justify-start gap-6 py-16 px-4 bg-white dark:bg-black">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-black dark:text-white mb-2">Daily News Quiz</h1>
+          <p className="text-xl text-zinc-500 dark:text-zinc-400">Test your memory of yesterday&apos;s news</p>
         </div>
-
-        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              Question {currentQuestionIndex + 1} of {questions.length}
-            </p>
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              ⏱ {minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`}
-            </p>
-          </div>
-
-          <h2 className="mb-6 h-[120px] overflow-hidden text-xl font-semibold text-black dark:text-zinc-50">
-            {currentQuestion.question}
-          </h2>
-
-          <div className="flex flex-col gap-3">
-            {currentQuestion.choices.map((choice: string) => (
+        <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
+          {!started ? (
+            <div className="flex flex-col gap-6 justify-start pt-2">
+              <div className="relative w-full">
+                <div className="bg-zinc-800 dark:bg-zinc-700 text-white text-sm rounded-xl px-4 py-3 text-center">
+                  10 questions from 8 neutral news sources, based on yesterday&apos;s headlines. The clock runs throughout. One attempt per question — no going back!
+                </div>
+                <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-zinc-800 dark:border-t-zinc-700" />
+              </div>
               <button
-                key={choice}
+                onClick={() => { setStarted(true); setIsRunning(true); }}
+                className="w-full rounded-xl bg-black px-4 py-3 font-bold text-white text-lg hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+              >
+                Start
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                </p>
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                  ⏱ {minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`}
+                </p>
+              </div>
+              <h2 className="mb-6 h-[120px] overflow-hidden text-xl font-semibold text-black dark:text-zinc-50">
+                {currentQuestion.question}
+              </h2>
+              <div className="flex flex-col gap-3">
+                {currentQuestion.choices.map((choice: string) => (
+                  <button
+                    key={choice}
+                    onClick={() => {
+                      setSelectedAnswer(choice);
+                      setIsRunning(false);
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left min-h-[48px] max-h-[96px] overflow-hidden ${selectedAnswer === null
+                      ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      : choice === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
+                        ? "border-green-500 bg-green-50 dark:bg-green-950"
+                        : selectedAnswer === choice
+                          ? "border-red-500 bg-red-50 dark:bg-red-950"
+                          : "border-zinc-200 opacity-50"
+                      }`}
+                  >
+                    {choice}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 h-[192px] overflow-hidden text-base text-zinc-700 dark:text-zinc-300">
+                {clampToSentences(typedText, 450)}
+              </p>
+              <button
                 onClick={() => {
-                  setSelectedAnswer(choice);
-                  setIsRunning(false);
+                  const newAnswers = [...answers, {
+                    question: currentQuestion.question,
+                    chosen: selectedAnswer ?? "",
+                    correct: currentQuestion.correctAnswer,
+                  }];
+                  setAnswers(newAnswers);
+                  if (currentQuestionIndex < questions.length - 1) {
+                    setCurrentQuestionIndex(currentQuestionIndex + 1);
+                    setSelectedAnswer(null);
+                    setTypedText("");
+                    setIsRunning(true);
+                    setStarted(true);
+                  } else {
+                    setQuizComplete(true);
+                    setIsRunning(false);
+                    localStorage.setItem("lastPlayedDate", getTodayDate());
+                  }
                 }}
-                className={`rounded-xl border px-4 py-3 text-left min-h-[48px] max-h-[96px] overflow-hidden ${selectedAnswer === null
-                  ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  : choice === currentQuestion.correctAnswer && (selectedAnswer === currentQuestion.correctAnswer || typingComplete)
-                    ? "border-green-500 bg-green-50 dark:bg-green-950"
-                    : selectedAnswer === choice
-                      ? "border-red-500 bg-red-50 dark:bg-red-950"
-                      : "border-zinc-200 opacity-50"
+                className={`mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 ${selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer)
+                  ? "visible"
+                  : "invisible"
                   }`}
               >
-                {choice}
+                {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish"}
               </button>
-            ))}
-          </div>
-
-          <p className="mt-4 h-[192px] overflow-hidden text-base text-zinc-700 dark:text-zinc-300">
-            {clampToSentences(typedText, 450)}
-          </p>
-
-          <button
-            onClick={() => {
-              const newAnswers = [...answers, {
-                question: currentQuestion.question,
-                chosen: selectedAnswer ?? "",
-                correct: currentQuestion.correctAnswer,
-              }];
-              setAnswers(newAnswers);
-
-              if (currentQuestionIndex < questions.length - 1) {
-                setCurrentQuestionIndex(currentQuestionIndex + 1);
-                setSelectedAnswer(null);
-                setTypedText("");
-                setIsRunning(true);
-              } else {
-                setQuizComplete(true);
-                setIsRunning(false);
-                localStorage.setItem("lastPlayedDate", getTodayDate());
-              }
-            }}
-            className={`mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 ${selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer)
-              ? "visible"
-              : "invisible"
-              }`}
-          >
-            {currentQuestionIndex < questions.length - 1 ? "Next Question" : "Finish"}
-          </button>
+            </>
+          )}
         </div>
       </main>
     </div>
