@@ -68,14 +68,14 @@ export default function PictureQuiz() {
 
     // Timer
     useEffect(() => {
-        if (!isRunning) return;
+        if (!isRunning || !started) return;
         const interval = setInterval(() => setSeconds(s => s + 1), 1000);
         return () => clearInterval(interval);
-    }, [isRunning]);
+    }, [isRunning, started]);
 
     // Auto-reveal slices
     useEffect(() => {
-        if (!isRunning || selectedAnswer !== null || !currentQuestion) return;
+        if (!isRunning || !started || selectedAnswer !== null || !currentQuestion) return;
         if (revealedSlices.length === 10) {
             setRevealedSlices(sliceOrder);
             setSelectedAnswer("__timeout__");
@@ -87,7 +87,7 @@ export default function PictureQuiz() {
             setRevealedSlices(prev => [...prev, sliceOrder[prev.length]]);
         }, REVEAL_INTERVAL);
         return () => clearTimeout(timeout);
-    }, [revealedSlices, isRunning, selectedAnswer, sliceOrder, currentQuestion]);
+    }, [revealedSlices, isRunning, started, selectedAnswer, sliceOrder, currentQuestion]);
 
     // Draw canvas
     useEffect(() => {
@@ -244,26 +244,46 @@ export default function PictureQuiz() {
                             height={600}
                             className="absolute inset-0 w-full h-full"
                         />
+                        {!started && (
+                            <>
+                                <div className="absolute top-4 left-4 right-4 z-10">
+                                    <div className="bg-zinc-800 dark:bg-zinc-700 text-white text-sm rounded-xl px-4 py-3 text-center">
+                                        Each picture reveals itself one slice at a time. If you haven&apos;t answered by the 10th slice, it counts as a miss. One attempt per picture — no going back!
+                                    </div>
+                                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-zinc-800 dark:border-t-zinc-700" />
+                                </div>
+                                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-xl">
+                                    <button
+                                        onClick={() => { setStarted(true); setIsRunning(true); }}
+                                        className="bg-white text-black font-bold px-8 py-4 rounded-xl text-lg hover:bg-zinc-100"
+                                    >
+                                        Start
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
 
-                    <div className="flex flex-col gap-3">
-                        {currentQuestion.choices.map((choice: string) => (
-                            <button
-                                key={choice}
-                                onClick={() => selectedAnswer === null && handleAnswer(choice)}
-                                className={`rounded-xl border px-4 py-3 text-left transition-colors ${selectedAnswer === null
-                                    ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                                    : choice === currentQuestion.answer
-                                        ? "border-green-500 bg-green-50 dark:bg-green-950"
-                                        : selectedAnswer === choice
-                                            ? "border-red-500 bg-red-50 dark:bg-red-950"
-                                            : "border-zinc-200 opacity-50 dark:border-zinc-700"
-                                    }`}
-                            >
-                                {choice}
-                            </button>
-                        ))}
-                    </div>
+                    {started && (
+                        <div className="flex flex-col gap-3">
+                            {currentQuestion.choices.map((choice: string) => (
+                                <button
+                                    key={choice}
+                                    onClick={() => selectedAnswer === null && handleAnswer(choice)}
+                                    className={`rounded-xl border px-4 py-3 text-left transition-colors ${selectedAnswer === null
+                                        ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                                        : choice === currentQuestion.answer
+                                            ? "border-green-500 bg-green-50 dark:bg-green-950"
+                                            : selectedAnswer === choice
+                                                ? "border-red-500 bg-red-50 dark:bg-red-950"
+                                                : "border-zinc-200 opacity-50 dark:border-zinc-700"
+                                        }`}
+                                >
+                                    {choice}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {selectedAnswer === "__timeout__" && (
                         <div className="mt-4 rounded-xl border border-red-500 bg-red-50 dark:bg-red-950 px-4 py-3 text-center">
