@@ -294,7 +294,7 @@ export default function Home() {
             <div className="flex flex-col gap-6 justify-start pt-2">
               <div className="relative w-full">
                 <div className="bg-zinc-800 dark:bg-zinc-700 text-white text-sm rounded-xl px-4 py-3 text-center">
-                  10 questions from 8 neutral news sources, based on yesterday&apos;s headlines. The clock runs throughout. One attempt per question — no going back!
+                  10 questions from 10 neutral news sources, based on yesterday&apos;s headlines. The clock runs throughout. One attempt per question — no going back!
                 </div>
                 <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-zinc-800 dark:border-t-zinc-700" />
               </div>

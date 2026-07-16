@@ -107,6 +107,8 @@ export async function GET() {
         { url: "https://thehill.com/rss/syndicator/19110", name: "The Hill" },
         { url: "https://feeds.a.dj.com/rss/RSSWorldNews.xml", name: "The Wall Street Journal" },
         { url: "https://newsnationnow.com/feed", name: "NewsNation" },
+        { url: "https://feeds.nbcnews.com/nbcnews/public/news", name: "NBC News" },
+        { url: "https://feeds.washingtonpost.com/rss/national", name: "The Washington Post" },
     ];
 
     const Parser = (await import("rss-parser")).default;
@@ -123,9 +125,14 @@ export async function GET() {
                         timeZone: "America/New_York",
                         year: "numeric", month: "2-digit", day: "2-digit"
                     }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
-                    return pubDate >= threeDaysAgo && pubDateString < todayString;
+                    if (!(pubDate >= threeDaysAgo && pubDateString < todayString)) return false;
+                    // Filter out non-English articles
+                    const title = (item.title || "").toLowerCase();
+                    const spanishWords = ["la ", "el ", "los ", "las ", " de ", " del ", " en ", " con ", " por ", " para ", " que ", " una ", " sobre ", " tras "];
+                    const spanishCount = spanishWords.filter(w => title.includes(w)).length;
+                    return spanishCount < 3;
                 })
-                .slice(0, 10)
+                .slice(0, 5)
                 .map((item: any) => ({
                     webTitle: item.title || "",
                     fields: {
@@ -142,7 +149,8 @@ export async function GET() {
             console.error("RSS feed error for " + feed.url + ":", error);
         }
     }
-
+    console.log("Total articles:", allArticles.length);
+    allArticles.forEach(a => console.log(a.source, "|", (a.webTitle || "").slice(0, 60)));
     const scoredArticles = allArticles.map((article: any) => {
         const title = (article.webTitle || "").toLowerCase();
         const titleWords = title.split(" ").filter((w: string) => w.length > 4);
@@ -159,8 +167,10 @@ export async function GET() {
     });
 
     scoredArticles.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
-
     const selected: any[] = [];
+    let sportsCount = 0;
+    const sportsWords = ["game", "match", "score", "player", "team", "league", "tournament", "championship", "soccer", "football", "basketball", "baseball", "tennis", "golf", "fifa", "nba", "nfl", "mlb", "nhl", "world cup"];
+
     for (const article of scoredArticles) {
         const title = (article.webTitle || "").toLowerCase();
         const titleWords = title.split(" ").filter((w: string) => w.length > 5);
@@ -171,10 +181,14 @@ export async function GET() {
             return matches >= 2;
         });
 
-        if (!isDuplicate) {
-            selected.push(article);
-        }
+        if (isDuplicate) continue;
 
+        // Limit sports articles to 1
+        const isSports = sportsWords.some(w => title.includes(w));
+        if (isSports && sportsCount >= 1) continue;
+        if (isSports) sportsCount++;
+
+        selected.push(article);
         if (selected.length >= 15) break;
     }
 
