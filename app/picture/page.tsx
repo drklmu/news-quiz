@@ -17,6 +17,7 @@ export default function PictureQuiz() {
     const [seconds, setSeconds] = useState(0);
     const [quizComplete, setQuizComplete] = useState(false);
     const [answers, setAnswers] = useState<{ correct: boolean }[]>([]);
+    const [started, setStarted] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
 
@@ -251,12 +252,12 @@ export default function PictureQuiz() {
                                 key={choice}
                                 onClick={() => selectedAnswer === null && handleAnswer(choice)}
                                 className={`rounded-xl border px-4 py-3 text-left transition-colors ${selectedAnswer === null
-                                        ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                                        : choice === currentQuestion.answer
-                                            ? "border-green-500 bg-green-50 dark:bg-green-950"
-                                            : selectedAnswer === choice
-                                                ? "border-red-500 bg-red-50 dark:bg-red-950"
-                                                : "border-zinc-200 opacity-50 dark:border-zinc-700"
+                                    ? "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                                    : choice === currentQuestion.answer
+                                        ? "border-green-500 bg-green-50 dark:bg-green-950"
+                                        : selectedAnswer === choice
+                                            ? "border-red-500 bg-red-50 dark:bg-red-950"
+                                            : "border-zinc-200 opacity-50 dark:border-zinc-700"
                                     }`}
                             >
                                 {choice}
