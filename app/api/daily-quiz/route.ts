@@ -167,30 +167,30 @@ export async function GET() {
     });
 
     scoredArticles.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
-    const selected: any[] = [];
-    let sportsCount = 0;
-    const sportsWords = ["game", "match", "score", "player", "team", "league", "tournament", "championship", "soccer", "football", "basketball", "baseball", "tennis", "golf", "fifa", "nba", "nfl", "mlb", "nhl", "world cup"];
 
-    for (const article of scoredArticles) {
-        const title = (article.webTitle || "").toLowerCase();
-        const titleWords = title.split(" ").filter((w: string) => w.length > 5);
-
-        const isDuplicate = selected.some((chosen: any) => {
-            const chosenTitle = (chosen.webTitle || "").toLowerCase();
-            const matches = titleWords.filter((w: string) => chosenTitle.includes(w)).length;
-            return matches >= 2;
-        });
-
-        if (isDuplicate) continue;
-
-        // Limit sports articles to 1
-        const isSports = sportsWords.some(w => title.includes(w));
-        if (isSports && sportsCount >= 1) continue;
-        if (isSports) sportsCount++;
-
-        selected.push(article);
-        if (selected.length >= 15) break;
+    function selectArticles(articles: any[], maxSports: number, dedupThreshold: number, limit: number) {
+        const selected: any[] = [];
+        let sportsCount = 0;
+        const sportsWords = ["game", "match", "score", "player", "team", "league", "tournament", "championship", "soccer", "football", "basketball", "baseball", "tennis", "golf", "fifa", "nba", "nfl", "mlb", "nhl", "world cup"];
+        for (const article of articles) {
+            const title = (article.webTitle || "").toLowerCase();
+            const titleWords = title.split(" ").filter((w: string) => w.length > 5);
+            const isDuplicate = selected.some((chosen: any) => {
+                const chosenTitle = (chosen.webTitle || "").toLowerCase();
+                const matches = titleWords.filter((w: string) => chosenTitle.includes(w)).length;
+                return matches >= dedupThreshold;
+            });
+            if (isDuplicate) continue;
+            const isSports = sportsWords.some(w => title.includes(w));
+            if (isSports && sportsCount >= maxSports) continue;
+            if (isSports) sportsCount++;
+            selected.push(article);
+            if (selected.length >= limit) break;
+        }
+        return selected;
     }
+
+    const selected = selectArticles(scoredArticles, 1, 2, 15);
 
     const results = await Promise.all(
         selected.map(async (article: any) => {
@@ -222,7 +222,36 @@ export async function GET() {
         })
     );
 
-    const validQuestions = results.filter((q) => q !== null).slice(0, 10);
+    // Build source log
+    const sourceLog = allArticles.reduce((acc: any, article: any) => {
+        const source = article.source || "Unknown";
+        acc[source] = (acc[source] || 0) + 1;
+        return acc;
+    }, {});
+    console.log("Source breakdown:", JSON.stringify(sourceLog));
+    let validQuestions = results.filter((q) => q !== null).slice(0, 10);
+
+    // Fallback Round 2: relax sports limit and dedup threshold
+    if (validQuestions.length < 10) {
+        console.log(`Only ${validQuestions.length} questions, trying relaxed selection...`);
+        const selected2 = selectArticles(scoredArticles, 3, 3, 15);
+        const results2 = await Promise.all(
+            selected2
+                .filter(a => !selected.includes(a)) // only new articles
+                .map(async (article: any) => {
+                    const bodyContent = article.fields?.bodyText || article.fields?.trailText || "";
+                    const title = article.webTitle || "";
+                    if (bodyContent.includes("£") || title.includes("£")) return null;
+                    const rawDate = article.pubDate || article.isoDate || null;
+                    const articleDate = rawDate ? new Date(rawDate).toLocaleDateString("en-US", {
+                        month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York",
+                    }) : "recently";
+                    return await generateQuestion(title, bodyContent, article.source || "NPR", articleDate);
+                })
+        );
+        const extra = results2.filter((q) => q !== null);
+        validQuestions = [...validQuestions, ...extra].slice(0, 10);
+    }
 
     if (validQuestions.length === 0) {
         return NextResponse.json({ error: "No questions generated" }, { status: 500 });
@@ -230,7 +259,7 @@ export async function GET() {
 
     await supabase
         .from("daily_quiz")
-        .insert({ quiz_date: today, questions: validQuestions });
+        .insert({ quiz_date: today, questions: validQuestions, source_log: sourceLog });
 
     return NextResponse.json({ questions: validQuestions });
 }
