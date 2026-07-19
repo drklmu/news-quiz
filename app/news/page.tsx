@@ -29,14 +29,13 @@ export default function Home() {
   const [typedText, setTypedText] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-
+  const [playId, setPlayId] = useState<string | null>(null);
   const questions = quizQuestions;
   const currentQuestion = questions[currentQuestionIndex];
   const typingComplete = currentQuestion ? typedText.length === currentQuestion.explanation.length : false;
 
-  const roundedSeconds = Math.floor(seconds / 10) * 10;
-  const minutes = Math.floor(roundedSeconds / 60);
-  const displaySeconds = roundedSeconds % 60;
+  const minutes = Math.floor(seconds / 60);
+  const displaySeconds = seconds % 60;
 
   const clampToSentences = (text: string, maxChars: number) => {
     if (text.length <= maxChars) return text;
@@ -100,7 +99,21 @@ export default function Home() {
         setLoadError(true);
       });
   }, []);
-
+  const saveScore = async (finalScore: number) => {
+    try {
+      const res = await fetch("/api/save-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quiz: "news", score: finalScore, seconds }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      const data = await res.json();
+      setPlayId(data.playId);
+      localStorage.setItem("lastPlayId", data.playId);
+    } catch (err) {
+      console.error("Could not save score:", err);
+    }
+  };
   if (isLoading) {
     return (
       <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -360,6 +373,8 @@ export default function Home() {
                     setQuizComplete(true);
                     setIsRunning(false);
                     localStorage.setItem("lastPlayedDate", getTodayDate());
+                    const finalScore = newAnswers.filter(a => a.chosen === a.correct).length;
+                    saveScore(finalScore);
                   }
                 }}
                 className={`mt-6 w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 ${selectedAnswer !== null && (typingComplete || selectedAnswer === currentQuestion.correctAnswer)

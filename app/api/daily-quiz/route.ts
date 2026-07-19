@@ -114,23 +114,27 @@ export async function GET() {
     const Parser = (await import("rss-parser")).default;
     const parser = new Parser();
 
+    const feedLog: Record<string, any> = {};
+
     for (const feed of rssFeeds) {
         try {
             const parsed = await parser.parseURL(feed.url);
-            const items = parsed.items
+            const raw = parsed.items.length;
+
+            const dated = parsed.items.filter((item: any) => {
+                if (!item.pubDate && !item.isoDate) return true;
+                const pubDate = new Date(item.pubDate || item.isoDate);
+                const pubDateString = pubDate.toLocaleDateString("en-CA", {
+                    timeZone: "America/New_York",
+                });
+                return pubDate >= threeDaysAgo && pubDateString < todayString;
+            });
+
+            const items = dated
                 .filter((item: any) => {
-                    if (!item.pubDate && !item.isoDate) return true;
-                    const pubDate = new Date(item.pubDate || item.isoDate);
-                    const pubDateString = pubDate.toLocaleDateString("en-US", {
-                        timeZone: "America/New_York",
-                        year: "numeric", month: "2-digit", day: "2-digit"
-                    }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
-                    if (!(pubDate >= threeDaysAgo && pubDateString < todayString)) return false;
-                    // Filter out non-English articles
                     const title = (item.title || "").toLowerCase();
                     const spanishWords = ["la ", "el ", "los ", "las ", " de ", " del ", " en ", " con ", " por ", " para ", " que ", " una ", " sobre ", " tras "];
-                    const spanishCount = spanishWords.filter(w => title.includes(w)).length;
-                    return spanishCount < 3;
+                    return spanishWords.filter(w => title.includes(w)).length < 3;
                 })
                 .slice(0, 5)
                 .map((item: any) => ({
@@ -143,12 +147,21 @@ export async function GET() {
                     pubDate: item.isoDate || item.pubDate || null,
                 }));
 
+            feedLog[feed.name] = {
+                raw,
+                afterDate: dated.length,
+                used: items.length,
+                newest: parsed.items[0]?.isoDate ?? parsed.items[0]?.pubDate ?? null,
+            };
 
             allArticles.push(...items);
-        } catch (error) {
+        } catch (error: any) {
+            feedLog[feed.name] = { error: error?.message ?? String(error) };
             console.error("RSS feed error for " + feed.url + ":", error);
         }
     }
+
+    console.log("Feed log:", JSON.stringify(feedLog, null, 2));
     console.log("Total articles:", allArticles.length);
     allArticles.forEach(a => console.log(a.source, "|", (a.webTitle || "").slice(0, 60)));
     const scoredArticles = allArticles.map((article: any) => {
@@ -223,12 +236,7 @@ export async function GET() {
     );
 
     // Build source log
-    const sourceLog = allArticles.reduce((acc: any, article: any) => {
-        const source = article.source || "Unknown";
-        acc[source] = (acc[source] || 0) + 1;
-        return acc;
-    }, {});
-    console.log("Source breakdown:", JSON.stringify(sourceLog));
+
     let validQuestions = results.filter((q) => q !== null).slice(0, 10);
 
     // Fallback Round 2: relax sports limit and dedup threshold
@@ -257,9 +265,11 @@ export async function GET() {
         return NextResponse.json({ error: "No questions generated" }, { status: 500 });
     }
 
-    await supabase
+    const { error: insertError } = await supabase
         .from("daily_quiz")
-        .insert({ quiz_date: today, questions: validQuestions, source_log: sourceLog });
+        .insert({ quiz_date: today, questions: validQuestions, source_log: feedLog });
+
+    if (insertError) console.error("daily_quiz insert failed:", insertError);
 
     return NextResponse.json({ questions: validQuestions });
 }
