@@ -14,7 +14,7 @@ export async function GET(request: Request) {
         { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", name: "The New York Times" },
         { url: "https://abcnews.go.com/abcnews/usheadlines", name: "ABC News" },
         { url: "https://thehill.com/rss/syndicator/19110", name: "The Hill" },
-        { url: "https://feeds.a.dj.com/rss/RSSWorldNews.xml", name: "The Wall Street Journal" },
+        { url: "https://feeds.content.dowjones.io/public/rss/RSSUSnews", name: "The Wall Street Journal" },
         { url: "https://newsnationnow.com/feed", name: "NewsNation" },
         { url: "https://feeds.nbcnews.com/nbcnews/public/news", name: "NBC News" },
         { url: "https://feeds.washingtonpost.com/rss/national", name: "The Washington Post" },
@@ -56,13 +56,9 @@ export async function GET(request: Request) {
 
     let inserted = 0;
     if (rows.length > 0) {
-        const deduped = Array.from(
-            new Map(rows.filter(r => r.url).map(r => [r.url, r])).values()
-        ).concat(rows.filter(r => !r.url));
-
         const { data, error } = await supabaseAdmin
             .from("article_pool")
-            .insert(deduped)
+            .upsert(rows, { onConflict: "url", ignoreDuplicates: true })
             .select("id");
         if (error) {
             console.error("Pool insert failed:", error);

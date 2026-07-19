@@ -1,21 +1,16 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "../../supabaseAdmin";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 function getTodayDate() {
-    return new Date().toLocaleDateString("en-US", {
-        timeZone: "America/New_York",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
+    return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
+function getYesterdayDate() {
+    const d = new Date(Date.now() - 864e5);
+    return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 }
 
 async function generateQuestion(headline: string, body: string, source: string, pubDate: string) {
@@ -75,28 +70,51 @@ async function generateQuestion(headline: string, body: string, source: string, 
     return quizData;
 }
 
-export async function GET() {
-    const today = getTodayDate();
+// Pull yesterday's articles from the pool, shaped like the old live-fetch output
+async function getArticlesFromPool() {
+    const yesterday = getYesterdayDate();
+    const { data, error } = await supabaseAdmin
+        .from("article_pool")
+        .select("source, title, body, published_at")
+        .eq("pub_date", yesterday);
 
-    const { data: existing } = await supabase
-        .from("daily_quiz")
-        .select("questions")
-        .eq("quiz_date", today)
-        .single();
-
-    if (existing) {
-        return NextResponse.json({ questions: existing.questions });
+    if (error) {
+        console.error("Pool read failed:", error);
+        return [];
     }
 
-    const now = new Date();
+    // Cap per source so no single feed dominates (mirrors old slice(0,5))
+    const perSource: Record<string, number> = {};
+    const shaped: any[] = [];
+    for (const row of data ?? []) {
+        const n = perSource[row.source] ?? 0;
+        if (n >= 5) continue;
+        perSource[row.source] = n + 1;
 
+        const title = (row.title || "").toLowerCase();
+        const spanishWords = ["la ", "el ", "los ", "las ", " de ", " del ", " en ", " con ", " por ", " para ", " que ", " una ", " sobre ", " tras "];
+        if (spanishWords.filter(w => title.includes(w)).length >= 3) continue;
+
+        shaped.push({
+            webTitle: row.title || "",
+            fields: {
+                bodyText: row.body || "",
+                trailText: row.body || "",
+            },
+            source: row.source,
+            pubDate: row.published_at,
+        });
+    }
+    return shaped;
+}
+
+// Fallback: fetch live if the pool is empty (day one, or a failed harvest)
+async function getArticlesLive() {
+    const now = new Date();
     const threeDaysAgo = new Date(now);
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     threeDaysAgo.setHours(0, 0, 0, 0);
-
     const todayString = getTodayDate();
-
-    const allArticles: any[] = [];
 
     const rssFeeds = [
         { url: "https://feeds.npr.org/1002/rss.xml", name: "NPR" },
@@ -105,7 +123,7 @@ export async function GET() {
         { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", name: "The New York Times" },
         { url: "https://abcnews.go.com/abcnews/usheadlines", name: "ABC News" },
         { url: "https://thehill.com/rss/syndicator/19110", name: "The Hill" },
-        { url: "https://feeds.a.dj.com/rss/RSSWorldNews.xml", name: "The Wall Street Journal" },
+        { url: "https://feeds.content.dowjones.io/public/rss/RSSUSnews", name: "The Wall Street Journal" },
         { url: "https://newsnationnow.com/feed", name: "NewsNation" },
         { url: "https://feeds.nbcnews.com/nbcnews/public/news", name: "NBC News" },
         { url: "https://feeds.washingtonpost.com/rss/national", name: "The Washington Post" },
@@ -113,24 +131,18 @@ export async function GET() {
 
     const Parser = (await import("rss-parser")).default;
     const parser = new Parser();
-
-    const feedLog: Record<string, any> = {};
+    const allArticles: any[] = [];
 
     for (const feed of rssFeeds) {
         try {
             const parsed = await parser.parseURL(feed.url);
-            const raw = parsed.items.length;
-
-            const dated = parsed.items.filter((item: any) => {
-                if (!item.pubDate && !item.isoDate) return true;
-                const pubDate = new Date(item.pubDate || item.isoDate);
-                const pubDateString = pubDate.toLocaleDateString("en-CA", {
-                    timeZone: "America/New_York",
-                });
-                return pubDate >= threeDaysAgo && pubDateString < todayString;
-            });
-
-            const items = dated
+            const items = parsed.items
+                .filter((item: any) => {
+                    if (!item.pubDate && !item.isoDate) return true;
+                    const pubDate = new Date(item.pubDate || item.isoDate);
+                    const pubDateString = pubDate.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+                    return pubDate >= threeDaysAgo && pubDateString < todayString;
+                })
                 .filter((item: any) => {
                     const title = (item.title || "").toLowerCase();
                     const spanishWords = ["la ", "el ", "los ", "las ", " de ", " del ", " en ", " con ", " por ", " para ", " que ", " una ", " sobre ", " tras "];
@@ -146,24 +158,37 @@ export async function GET() {
                     source: feed.name,
                     pubDate: item.isoDate || item.pubDate || null,
                 }));
-
-            feedLog[feed.name] = {
-                raw,
-                afterDate: dated.length,
-                used: items.length,
-                newest: parsed.items[0]?.isoDate ?? parsed.items[0]?.pubDate ?? null,
-            };
-
             allArticles.push(...items);
         } catch (error: any) {
-            feedLog[feed.name] = { error: error?.message ?? String(error) };
-            console.error("RSS feed error for " + feed.url + ":", error);
+            console.error("Live fetch error for " + feed.url + ":", error);
         }
     }
+    return allArticles;
+}
 
-    console.log("Feed log:", JSON.stringify(feedLog, null, 2));
-    console.log("Total articles:", allArticles.length);
-    allArticles.forEach(a => console.log(a.source, "|", (a.webTitle || "").slice(0, 60)));
+export async function GET() {
+    const today = getTodayDate();
+
+    const { data: existing } = await supabaseAdmin
+        .from("daily_quiz")
+        .select("questions")
+        .eq("quiz_date", today)
+        .single();
+
+    if (existing) {
+        return NextResponse.json({ questions: existing.questions });
+    }
+
+    // Pool first; fall back to live fetch if empty
+    let allArticles = await getArticlesFromPool();
+    let sourceUsed = "pool";
+    if (allArticles.length === 0) {
+        console.log("Pool empty, falling back to live fetch");
+        allArticles = await getArticlesLive();
+        sourceUsed = "live";
+    }
+    console.log(`Using ${allArticles.length} articles from ${sourceUsed}`);
+
     const scoredArticles = allArticles.map((article: any) => {
         const title = (article.webTitle || "").toLowerCase();
         const titleWords = title.split(" ").filter((w: string) => w.length > 4);
@@ -221,7 +246,7 @@ export async function GET() {
             const hasOldYear = yearsInTitle.some((y: string) => parseInt(y) < currentYear - 1);
             if (hasOldYear) return null;
 
-            const rawDate = article.pubDate || article.isoDate || null;
+            const rawDate = article.pubDate || null;
             const articleDate = rawDate ? new Date(rawDate).toLocaleDateString("en-US", {
                 month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York",
             }) : "recently";
@@ -235,22 +260,19 @@ export async function GET() {
         })
     );
 
-    // Build source log
-
     let validQuestions = results.filter((q) => q !== null).slice(0, 10);
 
-    // Fallback Round 2: relax sports limit and dedup threshold
     if (validQuestions.length < 10) {
         console.log(`Only ${validQuestions.length} questions, trying relaxed selection...`);
         const selected2 = selectArticles(scoredArticles, 3, 3, 15);
         const results2 = await Promise.all(
             selected2
-                .filter(a => !selected.includes(a)) // only new articles
+                .filter(a => !selected.includes(a))
                 .map(async (article: any) => {
                     const bodyContent = article.fields?.bodyText || article.fields?.trailText || "";
                     const title = article.webTitle || "";
                     if (bodyContent.includes("£") || title.includes("£")) return null;
-                    const rawDate = article.pubDate || article.isoDate || null;
+                    const rawDate = article.pubDate || null;
                     const articleDate = rawDate ? new Date(rawDate).toLocaleDateString("en-US", {
                         month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York",
                     }) : "recently";
@@ -265,9 +287,9 @@ export async function GET() {
         return NextResponse.json({ error: "No questions generated" }, { status: 500 });
     }
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
         .from("daily_quiz")
-        .insert({ quiz_date: today, questions: validQuestions, source_log: feedLog });
+        .insert({ quiz_date: today, questions: validQuestions });
 
     if (insertError) console.error("daily_quiz insert failed:", insertError);
 
