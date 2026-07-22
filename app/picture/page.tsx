@@ -20,6 +20,13 @@ export default function PictureQuiz() {
     const [started, setStarted] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
+    const [playId, setPlayId] = useState<string | null>(null);
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [ageGroup, setAgeGroup] = useState("");
+    const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+    const [signupError, setSignupError] = useState("");
+    const [saveScore, setSaveScore] = useState(false);
 
     function getTodayDate() {
         return new Date().toLocaleDateString("en-US", {
@@ -122,7 +129,21 @@ export default function PictureQuiz() {
         setIsRunning(false);
         setRevealedSlices(Array.from({ length: TOTAL_SLICES }, (_, i) => i));
     };
-
+    const savePlay = async (finalScore: number) => {
+        try {
+            const res = await fetch("/api/save-score", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ quiz: "picture", score: finalScore, seconds }),
+            });
+            if (!res.ok) throw new Error("save failed");
+            const data = await res.json();
+            setPlayId(data.playId);
+            localStorage.setItem("lastPicturePlayId", data.playId);
+        } catch (err) {
+            console.error("Could not save score:", err);
+        }
+    };
     const handleNext = () => {
         const isCorrect = selectedAnswer === currentQuestion.answer;
         const newAnswers = [...answers, { correct: isCorrect }];
@@ -136,6 +157,8 @@ export default function PictureQuiz() {
             setQuizComplete(true);
             setIsRunning(false);
             localStorage.setItem("lastPlayedPictureDate", getTodayDate());
+            const finalScore = newAnswers.filter(a => a.correct).length;
+            savePlay(finalScore);
         }
     };
 
@@ -207,9 +230,91 @@ export default function PictureQuiz() {
                         </p>
                     </div>
 
-                    <a href="/picture" className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-center">
-                        See Tomorrow's Quiz
-                    </a>
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                        <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-2">
+                            Compare your results
+                        </h2>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                            Sign up and we'll email you your ranking against all other players once today's results are in.
+                        </p>
+
+                        {signupStatus === "success" ? (
+                            <div className="rounded-xl border border-green-500 bg-green-50 dark:bg-green-950 px-4 py-3 text-center">
+                                <p className="text-green-700 dark:text-green-400 font-medium">You're signed up! ✓</p>
+                                <p className="text-green-600 dark:text-green-500 text-sm mt-1">
+                                    Check your email tonight for your ranking.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Your name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                                />
+                                <input
+                                    type="email"
+                                    placeholder="Your email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                                />
+                                <select
+                                    value={ageGroup}
+                                    onChange={(e) => setAgeGroup(e.target.value)}
+                                    className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                                >
+                                    <option value="">Select your age group</option>
+                                    <option value="under-60">Under 60</option>
+                                    <option value="60-65">60–65</option>
+                                    <option value="66-70">66–70</option>
+                                    <option value="71-75">71–75</option>
+                                    <option value="76-80">76–80</option>
+                                    <option value="81+">81+</option>
+                                </select>
+
+                                {signupStatus === "error" && (
+                                    <p className="text-sm text-red-600 dark:text-red-400 px-1">{signupError}</p>
+                                )}
+
+                                <button
+                                    onClick={async () => {
+                                        setSignupStatus("submitting");
+                                        setSignupError("");
+                                        try {
+                                            const res = await fetch("/api/signup", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    quiz: "picture",
+                                                    playId: playId ?? localStorage.getItem("lastPicturePlayId"),
+                                                    name,
+                                                    email,
+                                                    ageGroup,
+                                                }),
+                                            });
+                                            const data = await res.json();
+                                            if (!res.ok) {
+                                                setSignupError(data.error ?? "Something went wrong. Please try again.");
+                                                setSignupStatus("error");
+                                            } else {
+                                                setSignupStatus("success");
+                                            }
+                                        } catch {
+                                            setSignupError("Something went wrong. Please try again.");
+                                            setSignupStatus("error");
+                                        }
+                                    }}
+                                    disabled={signupStatus === "submitting"}
+                                    className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50"
+                                >
+                                    {signupStatus === "submitting" ? "Saving..." : "Send me my ranking tonight"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );

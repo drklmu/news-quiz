@@ -234,7 +234,7 @@ export default function Home() {
               Compare your results
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-              Sign up to receive your ranking compared to all other quizzers tonight at midnight.
+              Sign up and we'll email you your ranking against all other players once today's results are in.
             </p>
             <div className="flex flex-col gap-3 h-[220px] overflow-hidden">
               <input
