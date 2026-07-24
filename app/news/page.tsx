@@ -1,7 +1,6 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { supabase } from "../supabase";
 
 function getTodayDate() {
   return new Date().toLocaleDateString("en-US", {
@@ -20,6 +19,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [signupError, setSignupError] = useState("");
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -229,66 +229,90 @@ export default function Home() {
               </div>
             ))}
           </div>
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-2">
               Compare your results
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-              Sign up and we'll email you your ranking against all other players once today's results are in.
+              Sign up and we&apos;ll email you your ranking against all other players once today&apos;s results are in.
             </p>
-            <div className="flex flex-col gap-3 h-[220px] overflow-hidden">
-              <input
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-              />
-              <input
-                type="email"
-                placeholder="Your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-              />
-              <select
-                value={ageGroup}
-                onChange={(e) => setAgeGroup(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-              >
-                <option value="">Select your age group</option>
-                <option value="under-60">Under 60</option>
-                <option value="60-65">60–65</option>
-                <option value="66-70">66–70</option>
-                <option value="71-75">71–75</option>
-                <option value="76-80">76–80</option>
-                <option value="81+">81+</option>
-              </select>
-              <button
-                onClick={async () => {
-                  setSignupStatus("submitting");
-                  const score = answers.filter(a => a.chosen === a.correct).length;
-                  const { error } = await supabase
-                    .from("signups")
-                    .insert({
-                      name: name,
-                      email: email,
-                      age_group: ageGroup,
-                      score: score,
-                      quiz_date: getTodayDate()
-                    });
-                  if (error) {
-                    setSignupStatus("error");
-                  } else {
-                    setSignupStatus("success");
-                  }
-                }}
-                disabled={signupStatus === "submitting" || signupStatus === "success"}
-                className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50"
-              >
-                {signupStatus === "submitting" ? "Saving..." : signupStatus === "success" ? "You're signed up! ✓" : "Send me my ranking tonight"}
-              </button>
-            </div>
+
+            {signupStatus === "success" ? (
+              <div className="rounded-xl border border-green-500 bg-green-50 dark:bg-green-950 px-4 py-3 text-center">
+                <p className="text-green-700 dark:text-green-400 font-medium">You&apos;re signed up! ✓</p>
+                <p className="text-green-600 dark:text-green-500 text-sm mt-1">
+                  Check your email for your ranking once today&apos;s results are in.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+                <input
+                  type="email"
+                  placeholder="Your email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-xl border border-zinc-200 px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+                <select
+                  value={ageGroup}
+                  onChange={(e) => setAgeGroup(e.target.value)}
+                  className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                >
+                  <option value="">Select your age group</option>
+                  <option value="under-60">Under 60</option>
+                  <option value="60-65">60–65</option>
+                  <option value="66-70">66–70</option>
+                  <option value="71-75">71–75</option>
+                  <option value="76-80">76–80</option>
+                  <option value="81+">81+</option>
+                </select>
+
+                {signupStatus === "error" && (
+                  <p className="text-sm text-red-600 dark:text-red-400 px-1">{signupError}</p>
+                )}
+
+                <button
+                  onClick={async () => {
+                    setSignupStatus("submitting");
+                    setSignupError("");
+                    try {
+                      const res = await fetch("/api/signup", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          quiz: "news",
+                          playId: playId ?? localStorage.getItem("lastPlayId"),
+                          name,
+                          email,
+                          ageGroup,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) {
+                        setSignupError(data.error ?? "Something went wrong. Please try again.");
+                        setSignupStatus("error");
+                      } else {
+                        setSignupStatus("success");
+                      }
+                    } catch {
+                      setSignupError("Something went wrong. Please try again.");
+                      setSignupStatus("error");
+                    }
+                  }}
+                  disabled={signupStatus === "submitting"}
+                  className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50"
+                >
+                  {signupStatus === "submitting" ? "Saving..." : "Send me my ranking"}
+                </button>
+              </div>
+            )}
           </div>
         </main>
       </div>
