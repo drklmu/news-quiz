@@ -3,7 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "../../supabaseAdmin";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
+// Capitalize the first letter ONLY if the answer is entirely lowercase.
+// Any existing uppercase (BlackBerry, iPhone, eBay, Baghdad) means the human
+// cased it deliberately — leave it completely untouched.
+function normalizeAnswer(text: string): string {
+    if (text !== text.toLowerCase()) return text; // has a capital → trust it
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
 export async function GET(request: Request) {
     const authHeader = request.headers.get("authorization");
     if (authHeader !== "Bearer " + process.env.CRON_SECRET) {
@@ -37,16 +43,16 @@ export async function GET(request: Request) {
 
     for (let i = 0; i < urls.length; i++) {
         const pictureNumber = i + 1;
-        const subject = subjects[i] ?? "unknown";
+        const subject = normalizeAnswer(subjects[i] ?? "unknown");
         const isVisual = pictureNumber % 2 === 1; // odd = visual/slice, even = category
 
         const instruction = isVisual
-            ? `This picture is revealed to the player one pie-slice at a time, so early on they see only a FRAGMENT of it. Generate three WRONG answer options that are things an early partial slice of THIS image could plausibly be mistaken for — based on shape, color, curve, or texture of parts of the image, NOT on category. For example, an elephant's trunk seen alone might be mistaken for a snake or a garden hose. The wrong answers should be convincing while the image is mostly hidden, even if they become obviously wrong once fully revealed. Each wrong answer must also be plausible in SCALE and everyday CONTEXT with the real subject — something the fragment could genuinely be at roughly the same physical size, not merely another object of similar shape at a wildly different size (e.g. do not suggest a car steering wheel for a wristwatch just because both are round). Look at the actual image and reason about what its parts resemble.`
+            ? `This picture is revealed to the player one pie-slice at a time, so early on they see only a FRAGMENT of it. Generate three WRONG answer options that are things an early partial slice of THIS image could plausibly be mistaken for — based on shape, color, curve, or texture of parts of the image, NOT on category. For example, an elephant's trunk seen alone might be mistaken for a snake or a garden hose. The wrong answers should be convincing while the image is mostly hidden, even if they become obviously wrong once fully revealed. Each wrong answer must also be plausible in SCALE and everyday CONTEXT with the real subject — something the fragment could genuinely be at roughly the same physical size, not merely another object of similar shape at a wildly different size (e.g. do not suggest a car steering wheel for a wristwatch just because both are round). Each wrong answer must also be clearly WRONG once the full image is revealed — never a description that could also be true of the whole scene or its background. If the subject sits in a desert, do not offer "desert", "sand dunes", or "sunset over dunes" as a wrong answer; if it sits on a beach, do not offer "beach" or "ocean". The wrong answer must name a genuinely different thing, not a partial truth about the setting. Look at the actual image and reason about what its parts resemble.`
             : `Generate three WRONG answer options that belong to the SAME CATEGORY as the subject and would be genuinely hard to distinguish from it — same type of object, era, or class. For example, a ukelele's category-wrongs might be mandolin, banjo, or balalaika. The wrong answers should test whether the player truly knows the subject, not trick them visually.`;
 
         const prompt = `The correct answer for this image is "${subject}". ${instruction}
 
-Reply with ONLY a JSON array of exactly three short wrong-answer strings, like ["Wrong1","Wrong2","Wrong3"]. No other text.`;
+Write each wrong answer in sentence case: capitalize only the first letter and any proper nouns (brand names, place names, nationalities), everything else lowercase. For example "Chemical drums", "Dutch oven", "Red tablecloth". Reply with ONLY a JSON array of exactly three short wrong-answer strings, like ["Wrong one","Wrong two","Wrong three"]. No other text.`;
 
         try {
             const message = await anthropic.messages.create({
@@ -64,7 +70,13 @@ Reply with ONLY a JSON array of exactly three short wrong-answer strings, like [
             const content = message.content[0];
             if (content.type !== "text") throw new Error("Unexpected response");
 
-            const cleaned = content.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+            let cleaned = content.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+            // Model sometimes wraps the array in prose — extract the array itself
+            const firstBracket = cleaned.indexOf("[");
+            const lastBracket = cleaned.lastIndexOf("]");
+            if (firstBracket !== -1 && lastBracket !== -1) {
+                cleaned = cleaned.slice(firstBracket, lastBracket + 1);
+            }
             const wrongs = JSON.parse(cleaned) as string[];
 
             // Assemble the full choice set: correct answer + three wrongs, shuffled
