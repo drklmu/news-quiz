@@ -43,12 +43,14 @@ export async function GET() {
 
     if (!theme.images_ready || !theme.image_urls) {
         // Fall back to most recent date with images ready
+        const todayKey = getDateKey();
         const { data: fallback, error: fallbackError } = await supabaseAdmin
             .from("picture_themes")
             .select("*")
             .eq("images_ready", true)
             .not("image_urls", "is", null)
             .not("choices", "is", null)
+            .lte("date_key", todayKey)
             .order("date_key", { ascending: false })
             .limit(1)
             .single();

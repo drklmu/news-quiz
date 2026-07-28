@@ -34,6 +34,14 @@ export default function PictureQuiz() {
             year: "numeric", month: "2-digit", day: "2-digit",
         }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
     }
+    function formatDateKey(key: string) {
+        const months = ["January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"];
+        const [mm, dd] = key.split("-");
+        const monthIndex = parseInt(mm, 10) - 1;
+        if (monthIndex < 0 || monthIndex > 11) return key;
+        return `${months[monthIndex]} ${parseInt(dd, 10)}`;
+    }
 
     // Fetch quiz data
     useEffect(() => {
@@ -222,6 +230,11 @@ export default function PictureQuiz() {
 
                     <div className="rounded-2xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-800 p-6">
                         <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-2">Today's theme was:</p>
+                        {quizData?.date_key && (
+                            <p className="text-black dark:text-white font-semibold text-lg mb-1">
+                                {formatDateKey(quizData.date_key)}
+                            </p>
+                        )}
                         <p className="text-black dark:text-white font-semibold text-lg mb-2">
                             {quizData?.event_title} ({quizData?.event_year})
                         </p>
