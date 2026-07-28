@@ -1,12 +1,16 @@
 {
   "crons": [
     {
+      "path": "/api/harvest",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/cron",
-      "schedule": "0 10 * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/send-rankings",
-      "schedule": "45 10 * * *"
+      "schedule": "45 8 * * *"
     }
   ]
 }
