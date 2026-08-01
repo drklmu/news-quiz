@@ -30,6 +30,9 @@ export default function Home() {
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [playId, setPlayId] = useState<string | null>(null);
+  type AffiliateLink = { label: string; url: string };
+  const newsAffiliateLink = null as AffiliateLink | null;
+  // When ready, replace null with: { label: "Your product", url: "https://your-tracked-link" }
   const questions = quizQuestions;
   const currentQuestion = questions[currentQuestionIndex];
   const typingComplete = currentQuestion ? typedText.length === currentQuestion.explanation.length : false;
@@ -314,6 +317,25 @@ export default function Home() {
               </div>
             )}
           </div>
+
+          {newsAffiliateLink && (
+            <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-800 p-6">
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">
+                You might also enjoy
+              </p>
+              <a
+                href={newsAffiliateLink.url}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="block rounded-xl border border-zinc-200 dark:border-zinc-700 px-4 py-3 text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              >
+                {newsAffiliateLink.label} →
+              </a>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-3">
+                As an Amazon Associate we may earn from qualifying purchases.
+              </p>
+            </div>
+          )}
         </main>
       </div>
     );

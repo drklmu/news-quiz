@@ -27,6 +27,8 @@ export default function PictureQuiz() {
     const [signupStatus, setSignupStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
     const [signupError, setSignupError] = useState("");
     const [saveScore, setSaveScore] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [maskReady, setMaskReady] = useState(false);
 
     function getTodayDate() {
         return new Date().toLocaleDateString("en-US", {
@@ -76,6 +78,8 @@ export default function PictureQuiz() {
     // Initialize slices when question changes
     useEffect(() => {
         if (!currentQuestion) return;
+        setImageLoaded(false);
+        setMaskReady(false);
         const order = Array.from({ length: TOTAL_SLICES }, (_, i) => i).sort(() => Math.random() - 0.5);
         setSliceOrder(order);
         setRevealedSlices([order[0]]);
@@ -106,6 +110,7 @@ export default function PictureQuiz() {
 
     // Draw canvas
     useEffect(() => {
+        if (!imageLoaded) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
@@ -130,7 +135,8 @@ export default function PictureQuiz() {
             ctx.fill();
             ctx.globalCompositeOperation = "source-over";
         });
-    }, [revealedSlices]);
+        setMaskReady(true);
+    }, [revealedSlices, imageLoaded]);
 
     const handleAnswer = (choice: string) => {
         setSelectedAnswer(choice);
@@ -328,8 +334,26 @@ export default function PictureQuiz() {
                             </div>
                         )}
                     </div>
+                    {quizData?.affiliate_links && quizData.affiliate_links.length > 0 && (
+                        <div className="rounded-2xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-800 p-6">
+                            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">
+                                You might also enjoy
+                            </p>
+                            <a
+                                href={quizData.affiliate_links[0].url}
+                                target="_blank"
+                                rel="noopener noreferrer sponsored"
+                                className="block rounded-xl border border-zinc-200 dark:border-zinc-700 px-4 py-3 text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                            >
+                                {quizData.affiliate_links[0].label} →
+                            </a>
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-3">
+                                As an Amazon Associate we may earn from qualifying purchases.
+                            </p>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </div >
         );
     }
 
@@ -349,11 +373,13 @@ export default function PictureQuiz() {
                         <p className="text-sm text-zinc-500">⏱ {timeDisplay}</p>
                     </div>
 
-                    <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 mb-4">
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 mb-4 bg-black">
                         <img
+                            key={currentQuestion.image_url}
                             src={currentQuestion.image_url}
                             alt="Quiz image"
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover transition-opacity duration-150 ${maskReady ? "opacity-100" : "opacity-0"}`}
+                            onLoad={() => setImageLoaded(true)}
                             ref={el => { imageRef.current = el; }}
                         />
                         <canvas
