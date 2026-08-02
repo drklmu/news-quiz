@@ -366,7 +366,7 @@ export default function PictureQuiz() {
                     <p className="text-xl text-zinc-500 dark:text-zinc-400">What do you see?</p>
                 </div>
 
-                <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
+                <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col min-h-[700px]">
 
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm text-zinc-500">Picture {currentIndex + 1} of {questions.length}</p>

@@ -166,7 +166,7 @@ async function getArticlesLive() {
     return allArticles;
 }
 
-export async function GET() {
+export async function buildOrGetTodaysQuiz(): Promise<any[]> {
     const today = getTodayDate();
 
     const { data: existing } = await supabaseAdmin
@@ -176,7 +176,7 @@ export async function GET() {
         .single();
 
     if (existing) {
-        return NextResponse.json({ questions: existing.questions });
+        return existing.questions;
     }
 
     // Pool first; fall back to live fetch if empty
@@ -284,7 +284,7 @@ export async function GET() {
     }
 
     if (validQuestions.length === 0) {
-        return NextResponse.json({ error: "No questions generated" }, { status: 500 });
+        throw new Error("No questions generated");
     }
 
     const { error: insertError } = await supabaseAdmin
@@ -293,5 +293,14 @@ export async function GET() {
 
     if (insertError) console.error("daily_quiz insert failed:", insertError);
 
-    return NextResponse.json({ questions: validQuestions });
+    return validQuestions;
+}
+export async function GET() {
+    try {
+        const questions = await buildOrGetTodaysQuiz();
+        return NextResponse.json({ questions });
+    } catch (err) {
+        console.error("daily-quiz build failed:", err);
+        return NextResponse.json({ error: "No questions generated" }, { status: 500 });
+    }
 }
