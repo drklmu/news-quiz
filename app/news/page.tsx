@@ -342,13 +342,13 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col flex-1 items-center justify-start bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-md flex-col items-center justify-start gap-6 py-16 px-4 bg-white dark:bg-black">
+    <div className="flex flex-col min-h-full items-center justify-start bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex w-full max-w-md flex-col items-center justify-start gap-6 py-16 px-4 bg-white dark:bg-black">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-black dark:text-white mb-2">Daily News Quiz</h1>
           <p className="text-xl text-zinc-500 dark:text-zinc-400">Test your memory of yesterday&apos;s news</p>
         </div>
-        <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col h-[700px] overflow-hidden">
+        <div className="w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col min-h-[700px]">
           {!started ? (
             <div className="flex flex-col gap-6 justify-start pt-2">
               <div className="relative w-full">
@@ -374,7 +374,7 @@ export default function Home() {
                   ⏱ {minutes > 0 ? `${minutes} min ${displaySeconds} sec` : `${displaySeconds} sec`}
                 </p>
               </div>
-              <h2 className="mb-6 h-[120px] overflow-hidden text-xl font-semibold text-black dark:text-zinc-50">
+              <h2 className="mb-6 min-h-[120px] text-xl font-semibold text-black dark:text-zinc-50">
                 {currentQuestion.question}
               </h2>
               <div className="flex flex-col gap-3">
@@ -398,7 +398,7 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <p className="mt-4 h-[192px] overflow-hidden text-base text-zinc-700 dark:text-zinc-300">
+              <p className="mt-4 min-h-[192px] text-base text-zinc-700 dark:text-zinc-300">
                 {clampToSentences(typedText, 450)}
               </p>
               <button
