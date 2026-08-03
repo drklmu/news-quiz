@@ -39,12 +39,24 @@ async function generateQuestion(headline: string, body: string, source: string, 
     const content = message.content[0];
     if (content.type !== "text") throw new Error("Unexpected response");
 
-    const cleaned = content.text
+    let cleaned = content.text
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
         .replace(/[\x00-\x1F\x7F]/g, " ")
         .trim();
-    const quizData = JSON.parse(cleaned);
+    // Model sometimes wraps the JSON in prose ("I appreciate..."); extract the object
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+        cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+    }
+    let quizData;
+    try {
+        quizData = JSON.parse(cleaned);
+    } catch (err) {
+        console.error("Question parse failed, skipping:", err);
+        return null;
+    }
 
     if (quizData.explanation) {
         quizData.explanation = quizData.explanation.replace(
