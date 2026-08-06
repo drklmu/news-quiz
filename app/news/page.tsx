@@ -2,13 +2,13 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 
+function quizDayFor(date: Date): string {
+  const shifted = new Date(date.getTime() - 3 * 3600 * 1000);
+  return shifted.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 function getTodayDate() {
-  return new Date().toLocaleDateString("en-US", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).split("/").reverse().join("-").replace(/(\d{4})-(\d{2})-(\d{2})/, "$1-$3-$2");
+  return quizDayFor(new Date());
 }
 
 export default function Home() {

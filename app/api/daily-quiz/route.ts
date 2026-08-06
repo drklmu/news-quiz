@@ -4,13 +4,18 @@ import { supabaseAdmin } from "../../supabaseAdmin";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// The "quiz day" for a given moment: ET calendar date, rolling at 3am ET not midnight.
+function quizDayFor(date: Date): string {
+    const shifted = new Date(date.getTime() - 3 * 3600 * 1000);
+    return shifted.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 function getTodayDate() {
-    return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    return quizDayFor(new Date());
 }
 
 function getYesterdayDate() {
-    const d = new Date(Date.now() - 864e5);
-    return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    return quizDayFor(new Date(Date.now() - 864e5));
 }
 
 async function generateQuestion(headline: string, body: string, source: string, pubDate: string) {

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../supabaseAdmin";
 
+function quizDayFor(date: Date): string {
+    const shifted = new Date(date.getTime() - 3 * 3600 * 1000);
+    return shifted.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 export async function GET(request: Request) {
     const authHeader = request.headers.get("authorization");
     if (authHeader !== "Bearer " + process.env.CRON_SECRET) {
@@ -33,9 +38,7 @@ export async function GET(request: Request) {
             const items = parsed.items.map((item: any) => {
                 const rawDate = item.isoDate || item.pubDate || null;
                 const published = rawDate ? new Date(rawDate) : null;
-                const pubDate = published
-                    ? published.toLocaleDateString("en-CA", { timeZone: "America/New_York" })
-                    : null;
+                const pubDate = published ? quizDayFor(published) : null;
                 return {
                     source: feed.name,
                     title: item.title || "",
